@@ -215,7 +215,9 @@ Core = `list / new / apply / current`; `preview` + `recompile` round out v1.
 
 ## Open / deferred
 
-- adorn engine becomes its own git repo (rice itself is not yet under git — see
-  the standing "track configs w git?" task).
+- adorn lives in its own git repo (`~/projects/adorn`); the user content
+  (manifest, templates, theme catalog) will live under `~/.config/adorn/` in the
+  rice setup (rice itself is not yet under git — see the standing "track configs
+  w git?" task).
 - Possible later: color-expression DSL; absorbing wallust/pastel natively into a
   single binary; live nvim reload.

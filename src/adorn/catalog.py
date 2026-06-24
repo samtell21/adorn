@@ -21,9 +21,9 @@ def list_themes(root) -> list[str]:
     return sorted(p.name for p in d.iterdir() if p.is_dir())
 
 
-def current_theme(root):
+def current_theme(root) -> str | None:
     link = current_link(root)
-    if link.is_symlink():
+    if link.is_symlink() and link.exists():
         return Path(os.readlink(link)).name
     return None
 

@@ -28,7 +28,7 @@ switch back to an old one at will, with near-zero manual work.
 - A user-scriptable color-expression DSL. v1 ships a fixed role set + tunable
   knobs. (Revisit only if a concrete need appears.)
 - Live-reloading already-running nvim instances (next launch is fine).
-- adorn absorbing wallust/pastel natively — it shells out to them.
+- adorn absorbing the extractor/pastel natively — it shells out to them.
 - Pixel-perfect *automatic* reproduction of the existing hand-tuned palette
   (the override layer carries those deltas instead).
 
@@ -58,8 +58,15 @@ and theme a completely different set of apps.
   out, run hooks) where Rust's speed is irrelevant, and because the audience —
   ricers who tinker — benefit from a hackable, fork-and-tweak source. Matches the
   existing Python alarm CLI.
-- **Runtime deps:** `wallust` (palette extraction from image), `pastel` (color
-  math), Python stdlib `tomllib` + `jinja2`.
+- **Runtime deps:** an extractor (default ImageMagick `magick`; pluggable — any
+  command that prints `#RRGGBB` colors works, e.g. `wallust`), `pastel` (color
+  math), `jinja2`, Python stdlib `tomllib`.
+- **Extraction is pluggable:** adorn runs a manifest-configured `[extract]
+  command` (with `{path}` substituted), parses every `#RRGGBB` from its stdout,
+  and uses those as the raw colors. Default is an ImageMagick histogram command.
+  Since adorn does all the semantic reshaping itself, the extractor only needs to
+  emit raw dominant colors — so the default is simple and already installed, and
+  wallust/others can be dropped in via the manifest.
 
 ### Catalog layout (`~/.config/adorn/`)
 
@@ -108,9 +115,9 @@ Derived from what the configs already use (base16-ish + the waybar rainbow):
 
 ### Semantic algorithm (hue-anchored, theme-tinted)
 
-- **Mood** = average saturation + a lightness sense computed from wallust's
-  extracted palette (via pastel). The single knob that makes every derived role
-  *lean toward* the wallpaper.
+- **Mood** = average saturation + a lightness sense computed from the extracted
+  raw colors (via pastel). The single knob that makes every derived role *lean
+  toward* the wallpaper.
 - **6 hues:** hue fixed near the canonical angle for the role; saturation from
   mood; lightness from a per-role legibility target. Guarantees every role is
   present and legible on any wallpaper → fewest manual tweaks.
@@ -128,6 +135,11 @@ endpoints/length) in the manifest — not an expression DSL.
 ## Manifest (`adorn.toml`) sketch
 
 ```toml
+[extract]
+# {path} substituted; adorn parses every #RRGGBB from stdout. Default if omitted
+# is an equivalent ImageMagick histogram command. Swap in wallust here if wanted.
+command = "magick {path} -resize 10% -colors 16 -depth 8 -format %c histogram:info:-"
+
 [wallpaper]
 command = "swaymsg output '*' bg {path} fill"   # {path} substituted
 
@@ -161,8 +173,9 @@ output   = "~/.config/adorn/current/nvim/palette.lua"
 
 ## Mechanics
 
-- **Compile** (`palette.toml`): run wallust → compute mood → apply per-role rules
-  → write `palette.toml`. Committed, so switching to an old theme never
+- **Compile** (`palette.toml`): run the extract command → parse raw `#RRGGBB`
+  colors → compute mood → apply per-role rules → write `palette.toml`. Committed,
+  so switching to an old theme never
   recompiles; recompiling is an explicit action.
 - **Merge:** effective palette = `palette.toml` + `overrides.toml` layered on top.
   Generated and hand-tuned stay separate, so the generated half can be recompiled
@@ -184,7 +197,7 @@ adorn new <name> <wallpaper>  # compile from image → theme dir, then apply (--
 adorn apply <name>            # merge → render → atomic write → reload → set wallpaper → update current
 adorn current                 # show active theme
 adorn preview <name>          # print palette as pastel swatches WITHOUT applying
-adorn recompile <name>        # re-run wallust+pastel from the wallpaper (keeps overrides)
+adorn recompile <name>        # re-run extract+pastel from the wallpaper (keeps overrides)
 adorn edit <name>             # open overrides.toml in $EDITOR (optional convenience)
 ```
 
@@ -219,5 +232,5 @@ Core = `list / new / apply / current`; `preview` + `recompile` round out v1.
   (manifest, templates, theme catalog) will live under `~/.config/adorn/` in the
   rice setup (rice itself is not yet under git — see the standing "track configs
   w git?" task).
-- Possible later: color-expression DSL; absorbing wallust/pastel natively into a
-  single binary; live nvim reload.
+- Possible later: color-expression DSL; absorbing the extractor/pastel natively
+  into a single binary; live nvim reload; wallust as an alternate extract backend.

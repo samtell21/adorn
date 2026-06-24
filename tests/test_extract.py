@@ -36,3 +36,10 @@ def test_path_with_shell_metachars_does_not_inject(tmp_path):
     with pytest.raises(ValueError):  # echo emits no hex
         extract.extract("echo {path}", evil)
     assert not sentinel.exists()  # injection did NOT execute
+
+
+def test_eight_digit_rgba_returns_rgb(tmp_path):
+    # ImageMagick can emit #RRGGBBAA for alpha images; we want the RGB only
+    cmd = "printf '#3A9D23FF #11223344\\n' # {path}"
+    colors = extract.extract(cmd, tmp_path / "x.png")
+    assert colors == ["#3a9d23", "#112233"]

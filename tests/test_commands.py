@@ -7,33 +7,27 @@ from adorn import catalog, cli, commands, palette
 def build_catalog(root):
     (root / "templates").mkdir(parents=True)
     (root / "templates" / "waybar.tmpl").write_text("bg {{ bg }}\naccent {{ accent }}\n")
-    (root / "templates" / "swaylock.tmpl").write_text("ring={{ accent[1:] }}\n")
-    swaycfg = root / "swaylock.conf"
-    swaycfg.write_text("font=Foo\nindicator-radius=110\n", encoding="utf-8")
+    (root / "templates" / "sway.tmpl").write_text("output * bg {{ wallpaper }} fill\n")
     (root / "adorn.toml").write_text(
-        f"""
+        """
 [mood]
 bg_lightness = 0.07
 [ramp]
 name = "grad"
 length = 7
 hues = [300, 215, 175, 120, 40]
-[wallpaper]
-command = "true {{path}}"
 [[target]]
 name = "waybar"
 template = "waybar.tmpl"
 fragment = "colors.css"
 reload = "true"
 [[target]]
-name = "swaylock"
-template = "swaylock.tmpl"
+name = "sway"
+template = "sway.tmpl"
 fragment = "colors"
-via = "block"
-output = "{swaycfg}"
+reload = "true"
 """
     )
-    return swaycfg
 
 
 def make_wallpaper(path):
@@ -62,15 +56,14 @@ def test_apply_sets_current_symlink(tmp_path):
     assert catalog.current_theme(tmp_path) == "t"
 
 
-def test_apply_writes_swaylock_block(tmp_path):
-    swaycfg = build_catalog(tmp_path)
+def test_render_puts_wallpaper_in_fragment(tmp_path):
+    build_catalog(tmp_path)
     wp = tmp_path / "src.png"; make_wallpaper(wp)
-    commands.cmd_new(tmp_path, "t", str(wp))
-    text = swaycfg.read_text()
-    assert "font=Foo" in text                      # structural preserved
-    assert "ring=" in text                          # color block injected
-    from adorn import render
-    assert render.MARKER_BEGIN in text
+    commands.cmd_new(tmp_path, "t", str(wp), do_apply=False)
+    frag = catalog.theme_paths(tmp_path, "t").dir / "apps" / "sway" / "colors"
+    text = frag.read_text()
+    assert "output * bg" in text
+    assert str(catalog.theme_paths(tmp_path, "t").wallpaper) in text  # theme's wallpaper path
 
 
 def test_render_redramatizes_from_palette(tmp_path):

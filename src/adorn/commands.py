@@ -34,9 +34,10 @@ def cmd_current(root) -> None:
 
 
 def render_theme(root, name, manifest) -> None:
-    pal = effective_palette(root, name)
-    apps_dir = catalog.theme_paths(root, name).dir / "apps"
-    render_mod.materialize(manifest, pal, apps_dir)
+    tp = catalog.theme_paths(root, name)
+    context = dict(effective_palette(root, name))
+    context["wallpaper"] = str(tp.wallpaper)
+    render_mod.materialize(manifest, context, tp.dir / "apps")
 
 
 def cmd_render(root, name) -> None:
@@ -50,12 +51,8 @@ def cmd_apply(root, name) -> None:
     tp = catalog.theme_paths(root, name)
     apps_dir = tp.dir / "apps"
     if not apps_dir.exists():
-        render_theme(root, name, manifest)   # bootstrap a theme that has no apps/ yet
+        render_theme(root, name, manifest)
     catalog.set_current(root, name)
-    for target in manifest.targets:
-        if target.via == "block" and target.output is not None:
-            frag = apps_dir / target.name / target.fragment
-            render_mod.write_block(target.output, frag.read_text(encoding="utf-8"))
     reload_mod.run_reloads(manifest)
     reload_mod.set_wallpaper(manifest, tp.wallpaper)
 

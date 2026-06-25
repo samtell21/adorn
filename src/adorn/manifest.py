@@ -1,5 +1,4 @@
 """Load and validate adorn.toml into typed Manifest/Target objects."""
-import os
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -9,17 +8,11 @@ DEFAULT_EXTRACT = (
 )
 
 
-def _expand(p: str) -> Path:
-    return Path(os.path.expanduser(p))
-
-
 @dataclass(frozen=True)
 class Target:
     name: str
     template: str | None = None
     fragment: str | None = None
-    via: str = "current"
-    output: Path | None = None
     reload: str | None = None
 
 
@@ -53,14 +46,11 @@ def load(path) -> Manifest:
     for t in raw_targets:
         if "name" not in t:
             raise ValueError(f"target missing name: {t!r}")
-        out = t.get("output")
         targets.append(
             Target(
                 name=t["name"],
                 template=t.get("template"),
                 fragment=t.get("fragment"),
-                via=t.get("via", "current"),
-                output=_expand(out) if out else None,
                 reload=t.get("reload"),
             )
         )

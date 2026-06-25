@@ -7,21 +7,21 @@ from adorn.manifest import Target
 
 def test_run_reload_executes_command(tmp_path):
     marker = tmp_path / "reloaded"
-    t = Target("x", output=tmp_path / "out", reload=f"touch {marker}")
+    t = Target("x", reload=f"touch {marker}")
     reload_mod.run_reload(t)
     assert marker.exists()
 
 
 def test_run_reload_none_is_noop(tmp_path):
-    reload_mod.run_reload(Target("x", output=tmp_path / "out"))  # no error
+    reload_mod.run_reload(Target("x"))  # no error
 
 
 def test_run_reloads_all(tmp_path):
     a, b = tmp_path / "a", tmp_path / "b"
     m = types.SimpleNamespace(
         targets=(
-            Target("a", output=tmp_path / "oa", reload=f"touch {a}"),
-            Target("b", output=tmp_path / "ob", reload=f"touch {b}"),
+            Target("a", reload=f"touch {a}"),
+            Target("b", reload=f"touch {b}"),
         )
     )
     reload_mod.run_reloads(m)

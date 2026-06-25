@@ -83,14 +83,22 @@ def cmd_recompile(root, name, saturation_floor=None) -> None:
     print(f"palette recompiled; run `adorn render {name}` to update apps/")
 
 
-STARTER_MANIFEST = '''# adorn manifest — declares which apps adorn themes.
+STARTER_MANIFEST = '''# adorn manifest — which apps adorn themes. Color derivation lives per-scheme
+# in schemes/<scheme>/scheme.toml (see schemes/default/scheme.toml).
 
 [extract]
 command = "magick {path} -resize 10% -colors 16 -depth 8 -format %c histogram:info:-"
 
-[wallpaper]
-# command = "swaymsg output '*' bg {path} fill"
+# One [[target]] per app. Example:
+# [[target]]
+# name = "kitty"
+# template = "kitty-colors.tmpl"   # lives in schemes/<scheme>/
+# fragment = "colors.conf"          # materialized at themes/<t>/apps/kitty/colors.conf
+# reload = "kitty @ set-colors --all ~/.config/adorn/current/apps/kitty/colors.conf"
+'''
 
+
+STARTER_SCHEME = '''# default scheme — color derivation. Copy this dir to make a new scheme.
 [mood]
 saturation_strength = 1.0
 hue_saturation_floor = 0.0   # raise (e.g. 0.30) for more saturated semantic colors
@@ -101,12 +109,8 @@ name = "grad"
 length = 7
 hues = [300, 250, 215, 175, 120, 60, 40]
 
-# One [[target]] per app. Example:
-# [[target]]
-# name = "kitty"
-# template = "kitty.conf.tmpl"          # lives in templates/
-# output = "~/.config/kitty/colors.conf"
-# reload = "kitty @ set-colors --all ~/.config/kitty/colors.conf"
+# [hues]   # override canonical hue per role, e.g.  red = 5
+# [fixed]  # pin roles to a literal hex regardless of wallpaper, e.g.  bg = "#000000"
 '''
 
 
@@ -115,12 +119,14 @@ def cmd_init(root) -> None:
     manifest_path = root / "adorn.toml"
     if manifest_path.exists():
         raise FileExistsError(f"adorn config already exists at {manifest_path}")
-    (root / "templates").mkdir(parents=True, exist_ok=True)
+    (root / "schemes" / "default").mkdir(parents=True, exist_ok=True)
     (root / "themes").mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(STARTER_MANIFEST, encoding="utf-8")
+    (root / "schemes" / "default" / "scheme.toml").write_text(STARTER_SCHEME, encoding="utf-8")
     print(f"created adorn config at {root}")
     print(f"  edit {manifest_path} — add a [[target]] per app")
-    print(f"  put templates in {root / 'templates'}")
+    print(f"  color derivation: {root / 'schemes' / 'default' / 'scheme.toml'}")
+    print(f"  put templates in {root / 'schemes' / 'default'}")
 
 
 def cmd_alter(root, name, colors, write, command) -> None:

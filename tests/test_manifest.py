@@ -5,15 +5,6 @@ import pytest
 from adorn import manifest
 
 MANIFEST = """
-[mood]
-saturation_strength = 1.0
-bg_lightness = 0.07
-
-[ramp]
-name = "grad"
-length = 7
-hues = [300, 215, 175, 120, 40]
-
 [wallpaper]
 command = "swaymsg output '*' bg {path} fill"
 

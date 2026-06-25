@@ -1,6 +1,8 @@
 # src/adorn/commands.py
 """High-level commands wiring the modules together."""
+import re
 import shutil
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -127,6 +129,78 @@ def cmd_init(root) -> None:
     print(f"created adorn config at {root}")
     print(f"  edit {manifest_path} — add a [[target]] per app")
     print(f"  put templates in {root / 'templates'}")
+
+
+def cmd_alter(root, name, colors, write, command) -> None:
+    if not command:
+        raise ValueError("no pastel command given")
+    pal = effective_palette(root, name)
+
+    # flatten palette into selectable colors (ramp -> grad0..gradN-1)
+    selectable = {}
+    for k, v in pal.items():
+        if isinstance(v, list):
+            for i, c in enumerate(v):
+                selectable[f"{k}{i}"] = c
+        else:
+            selectable[k] = v
+
+    if colors:
+        for c in colors:
+            if c not in selectable:
+                raise ValueError(f"unknown color role: {c}")
+        selected = list(colors)
+    else:
+        selected = list(selectable.keys())
+
+    # expand +role sigils in the command
+    expanded = []
+    for tok in command:
+        if tok.startswith("+"):
+            role = tok[1:]
+            if role not in selectable:
+                raise ValueError(f"unknown color role in +{role}")
+            expanded.append(selectable[role])
+        else:
+            expanded.append(tok)
+
+    stdin = "".join(selectable[s] + "\n" for s in selected)
+    # run `pastel <expanded>` then normalize via `pastel format hex`.
+    # argv lists + NO shell: user tokens can't inject (a token like ";rm" is just
+    # a literal pastel argument, which pastel rejects).
+    step = subprocess.run(
+        ["pastel", *expanded], input=stdin, capture_output=True, text=True, check=True
+    )
+    norm = subprocess.run(
+        ["pastel", "format", "hex"], input=step.stdout, capture_output=True, text=True, check=True
+    )
+    results = [ln.strip().lower() for ln in norm.stdout.splitlines() if ln.strip()]
+    if len(results) != len(selected):
+        raise ValueError(
+            f"pastel produced {len(results)} color(s) for {len(selected)} selected — "
+            f"refusing an ambiguous mapping (set multiple colors with separate calls)"
+        )
+
+    for role, newc in zip(selected, results):
+        print(f"{role:<14} {selectable[role]} -> {newc}")
+
+    if write:
+        tp = catalog.theme_paths(root, name)
+        overrides = palette_mod.load(tp.overrides)
+        ramp_name, ramp_list = None, None
+        for role, newc in zip(selected, results):
+            m = re.fullmatch(r"([a-zA-Z_]+)(\d+)", role)
+            if m and isinstance(pal.get(m.group(1)), list):
+                base, idx = m.group(1), int(m.group(2))
+                if ramp_list is None:
+                    ramp_name, ramp_list = base, list(pal[base])
+                ramp_list[idx] = newc
+            else:
+                overrides[role] = newc
+        if ramp_list is not None:
+            overrides[ramp_name] = ramp_list
+        palette_mod.dump(overrides, tp.overrides)
+        print(f"wrote {len(selected)} override(s) to {tp.overrides}")
 
 
 def cmd_preview(root, name) -> None:

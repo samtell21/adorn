@@ -39,8 +39,23 @@ def main(argv=None) -> int:
     p_preview = sub.add_parser("preview", help="print a theme's palette as swatches")
     p_preview.add_argument("name")
     sub.add_parser("init", help="scaffold a starter ~/.config/adorn config")
+    p_alter = sub.add_parser(
+        "alter",
+        help="run a pastel pipeline over a theme's colors",
+        description=(
+            "Run a pastel pipeline over a theme's colors.  "
+            "Options (-c/-w) must come before the pastel command.  "
+            "Use +role tokens in the pastel args to reference a palette color by name.  "
+            "Example: adorn alter t -c red saturate 0.3"
+        ),
+    )
+    p_alter.add_argument("name")
+    p_alter.add_argument("-c", "--color", default=None,
+                         help="comma-separated roles (default: all)")
+    p_alter.add_argument("-w", "--write", action="store_true",
+                         help="write results to the theme's overrides.toml")
 
-    args = parser.parse_args(argv)
+    args, extras = parser.parse_known_args(argv)
     root = Path(args.root) if args.root else DEFAULT_ROOT
 
     try:
@@ -62,6 +77,9 @@ def main(argv=None) -> int:
             commands.cmd_preview(root, args.name)
         elif args.command == "init":
             commands.cmd_init(root)
+        elif args.command == "alter":
+            roles = args.color.split(",") if args.color else None
+            commands.cmd_alter(root, args.name, roles, args.write, extras)
     except (FileNotFoundError, FileExistsError, ValueError) as e:
         print(f"adorn: {e}", file=sys.stderr)
         return 1

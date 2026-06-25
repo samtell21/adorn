@@ -36,7 +36,7 @@ class Manifest:
 
 def load(path) -> Manifest:
     path = Path(path)
-    data = tomllib.loads(path.read_text())
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
     root = path.parent
 
     raw_targets = data.get("target", [])

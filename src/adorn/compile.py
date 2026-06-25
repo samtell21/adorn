@@ -33,6 +33,8 @@ def build_palette(raw: list[str], manifest) -> dict:
     bg_l = manifest.mood.get("bg_lightness", 0.07)
 
     sat = min(1.0, mood_saturation(raw) * strength)
+    # most-saturated raw color is the wallpaper's signature; max() picks the
+    # first on ties (rare, any winner is acceptable)
     accent = max(raw, key=lambda c: color.hsl(c)[1])
     dom_h = color.hsl(accent)[0]
 

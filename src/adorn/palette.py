@@ -11,7 +11,7 @@ def load(path) -> dict:
     p = Path(path)
     if not p.exists():
         return {}
-    return tomllib.loads(p.read_text())
+    return tomllib.loads(p.read_text(encoding="utf-8"))
 
 
 def merge(base: dict, override: dict) -> dict:
@@ -27,4 +27,4 @@ def dump(palette: dict, path) -> None:
             lines.append(f"{key} = [{items}]")
         else:
             lines.append(f'{key} = "{value}"')
-    Path(path).write_text("\n".join(lines) + "\n")
+    Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")

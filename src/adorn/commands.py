@@ -51,8 +51,8 @@ def cmd_new(root, name, wallpaper, do_apply=True) -> None:
     theme_dir = catalog.new_theme_dir(root, name)
     dest = theme_dir / ("wallpaper" + Path(wallpaper).suffix)
     shutil.copy(wallpaper, dest)
+    (theme_dir / "overrides.toml").write_text("# per-theme color/role overrides\n", encoding="utf-8")
     compile_mod.compile_theme(root, name, manifest)
-    (theme_dir / "overrides.toml").write_text("# per-theme color/role overrides\n")
     if do_apply:
         cmd_apply(root, name)
 

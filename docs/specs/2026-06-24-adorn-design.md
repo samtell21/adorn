@@ -128,9 +128,26 @@ Derived from what the configs already use (base16-ish + the waybar rainbow):
   with a whisper of theme. Any theme can pin `bg = "#000000"` in `overrides.toml`.
 - **Rainbow `grad0..6`:** a configurable ramp — a hue sweep at the theme's S/L so
   it stays colorful but leans toward the theme.
+- **Saturation floor (legibility/distinguishability knob):** the hue-role
+  saturation is `clamp(mood_sat × saturation_strength, hue_saturation_floor,
+  1.0)`. Default floor is `0.0` (pure mood — the preferred muted look on muted
+  wallpapers). Raising it (e.g. `0.30`) lifts the 6 hue roles + ramp to a minimum
+  saturation so semantic/ANSI colors stay tellable apart on a muted wallpaper,
+  *without* touching `accent`/`bg`/`fg`. Discovered via real-wallpaper testing:
+  at floor 0 a muted wallpaper makes red≈yellow≈muted (fine as UI, blurry for a
+  terminal). The floor is settable per generation (see commands) so one image can
+  yield several saved variants at different saturations.
 
-v1 exposes tunable knobs (canonical hues, mood strength, bg lightness, ramp
-endpoints/length) in the manifest — not an expression DSL.
+v1 exposes tunable knobs (canonical hues, mood strength + saturation floor, bg
+lightness, ramp endpoints/length) in the manifest — not an expression DSL.
+
+## Compile stats
+
+`adorn new` and `adorn recompile` print a stats block to stdout after compiling:
+theme name, wallpaper, raw-color count, mood saturation, the saturation floor
+used, the effective hue saturation, and the key role swatches with their H/S/L —
+so the chosen saturation is visible without re-deriving it via `pastel`. Pipe to
+a file to keep a record.
 
 ## Manifest (`adorn.toml`) sketch
 
@@ -144,7 +161,8 @@ command = "magick {path} -resize 10% -colors 16 -depth 8 -format %c histogram:in
 command = "swaymsg output '*' bg {path} fill"   # {path} substituted
 
 [mood]
-saturation_strength = 1.0     # how hard derived roles lean toward wallpaper mood
+saturation_strength = 1.0      # how hard derived roles lean toward wallpaper mood
+hue_saturation_floor = 0.0     # min saturation for the 6 hue roles + ramp (0 = pure mood)
 bg_lightness = 0.07
 
 [ramp]                         # the waybar rainbow
@@ -192,14 +210,19 @@ output   = "~/.config/adorn/current/nvim/palette.lua"
 ## Command interface
 
 ```
-adorn list                    # catalog, * marks current
-adorn new <name> <wallpaper>  # compile from image → theme dir, then apply (--no-apply to skip)
-adorn apply <name>            # merge → render → atomic write → reload → set wallpaper → update current
-adorn current                 # show active theme
-adorn preview <name>          # print palette as pastel swatches WITHOUT applying
-adorn recompile <name>        # re-run extract+pastel from the wallpaper (keeps overrides)
-adorn edit <name>             # open overrides.toml in $EDITOR (optional convenience)
+adorn list                                # catalog, * marks current
+adorn new <name> <wallpaper> [--saturation F]  # compile from image → theme dir, print stats, then apply (--no-apply to skip)
+adorn apply <name>                        # merge → render → atomic write → reload → set wallpaper → update current
+adorn current                             # show active theme
+adorn preview <name>                      # print palette as pastel swatches WITHOUT applying
+adorn recompile <name> [--saturation F]   # re-run extract+pastel from the wallpaper, print stats (keeps overrides)
+adorn edit <name>                         # open overrides.toml in $EDITOR (optional convenience)
 ```
+
+`--saturation F` overrides `[mood] hue_saturation_floor` for that compile, so one
+image can produce several saved variants (e.g. `new succ-muted img`, `new
+succ-mid img --saturation 0.30`). `new`/`recompile` print a compile-stats block
+(see "Compile stats").
 
 Core = `list / new / apply / current`; `preview` + `recompile` round out v1.
 

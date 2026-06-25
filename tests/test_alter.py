@@ -66,3 +66,20 @@ def test_alter_write_ramp_entry_rebuilds_list(tmp_path):
 def test_cli_alter(tmp_path):
     setup_theme(tmp_path)
     assert cli.main(["--root", str(tmp_path), "alter", "t", "-c", "red", "saturate", "0.3"]) == 0
+
+
+def test_alter_bad_pastel_command_is_clean_error(tmp_path):
+    setup_theme(tmp_path)
+    with pytest.raises(ValueError, match="pastel failed"):
+        commands.cmd_alter(tmp_path, "t", ["red"], False, ["definitelynotapastelcommand"])
+
+
+def test_cli_rejects_unknown_flag_on_nonalter_subcommand(tmp_path):
+    setup_theme(tmp_path)
+    with pytest.raises(SystemExit):
+        cli.main(["--root", str(tmp_path), "list", "--bogus"])
+
+
+def test_cli_alter_still_passes_through_command(tmp_path):
+    setup_theme(tmp_path)
+    assert cli.main(["--root", str(tmp_path), "alter", "t", "-c", "red", "saturate", "0.3"]) == 0

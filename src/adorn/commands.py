@@ -168,12 +168,15 @@ def cmd_alter(root, name, colors, write, command) -> None:
     # run `pastel <expanded>` then normalize via `pastel format hex`.
     # argv lists + NO shell: user tokens can't inject (a token like ";rm" is just
     # a literal pastel argument, which pastel rejects).
-    step = subprocess.run(
-        ["pastel", *expanded], input=stdin, capture_output=True, text=True, check=True
-    )
-    norm = subprocess.run(
-        ["pastel", "format", "hex"], input=step.stdout, capture_output=True, text=True, check=True
-    )
+    try:
+        step = subprocess.run(
+            ["pastel", *expanded], input=stdin, capture_output=True, text=True, check=True
+        )
+        norm = subprocess.run(
+            ["pastel", "format", "hex"], input=step.stdout, capture_output=True, text=True, check=True
+        )
+    except subprocess.CalledProcessError as e:
+        raise ValueError(f"pastel failed: {(e.stderr or '').strip()}") from e
     results = [ln.strip().lower() for ln in norm.stdout.splitlines() if ln.strip()]
     if len(results) != len(selected):
         raise ValueError(

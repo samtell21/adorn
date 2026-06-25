@@ -56,6 +56,8 @@ def main(argv=None) -> int:
                          help="write results to the theme's overrides.toml")
 
     args, extras = parser.parse_known_args(argv)
+    if args.command != "alter" and extras:
+        parser.error(f"unrecognized arguments: {' '.join(extras)}")
     root = Path(args.root) if args.root else DEFAULT_ROOT
 
     try:

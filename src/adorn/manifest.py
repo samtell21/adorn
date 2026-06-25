@@ -16,8 +16,10 @@ def _expand(p: str) -> Path:
 @dataclass(frozen=True)
 class Target:
     name: str
-    output: Path
     template: str | None = None
+    fragment: str | None = None
+    via: str = "current"
+    output: Path | None = None
     reload: str | None = None
 
 
@@ -51,13 +53,14 @@ def load(path) -> Manifest:
     for t in raw_targets:
         if "name" not in t:
             raise ValueError(f"target missing name: {t!r}")
-        if "output" not in t:
-            raise ValueError(f"target {t['name']!r} missing output")
+        out = t.get("output")
         targets.append(
             Target(
                 name=t["name"],
-                output=_expand(t["output"]),
                 template=t.get("template"),
+                fragment=t.get("fragment"),
+                via=t.get("via", "current"),
+                output=_expand(out) if out else None,
                 reload=t.get("reload"),
             )
         )

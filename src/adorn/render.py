@@ -1,8 +1,12 @@
-"""Render targets to outputs (Jinja2 or verbatim files/), then write atomically."""
+"""Render target templates into a theme's apps/ fragments, and manage the
+swaylock-style delimited color block for apps that cannot include a file."""
 import os
 from pathlib import Path
 
 import jinja2
+
+MARKER_BEGIN = "# >>> adorn (managed) >>>"
+MARKER_END = "# <<< adorn (managed) <<<"
 
 
 def make_env(templates_dir) -> jinja2.Environment:
@@ -13,36 +17,50 @@ def make_env(templates_dir) -> jinja2.Environment:
     )
 
 
-def render_all(manifest, palette: dict, files_dir) -> dict[Path, str]:
-    """Return {output_path: content} for every target. Raises before any write."""
-    env = make_env(manifest.templates_dir)
-    outputs: dict = {}
-    for target in manifest.targets:
-        override = Path(files_dir) / target.name
-        if override.is_dir():
-            inner = next((p for p in sorted(override.iterdir()) if p.is_file()), None)
-            if inner is None:
-                raise ValueError(f"files/{target.name}/ exists but is empty")
-            outputs[target.output] = inner.read_text(encoding="utf-8")
-        elif target.template:
-            outputs[target.output] = env.get_template(target.template).render(**palette)
-        else:
-            raise ValueError(
-                f"target {target.name!r} has no template and no files/ override"
-            )
-    return outputs
+def _atomic_write(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".adorn-tmp")
+    tmp.write_text(content, encoding="utf-8")
+    os.replace(tmp, path)
 
 
-def write_all(outputs: dict) -> None:
-    """Write each output atomically (temp file + os.replace).
+def materialize(manifest, palette: dict, apps_dir) -> dict:
+    """Render each target with a template into apps_dir/<target>/<fragment>.
 
-    Atomicity is per-file (no half-written file), not cross-file: a crash
-    mid-loop can leave some outputs updated and others stale. Re-applying is
-    idempotent, so this is acceptable.
+    Returns {target_name: written_path}. Raises (before writing anything more)
+    on a missing role, so a bad template can't leave a half-materialized set.
     """
-    for path, content in outputs.items():
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_name(path.name + ".adorn-tmp")
-        tmp.write_text(content, encoding="utf-8")
-        os.replace(tmp, path)
+    env = make_env(manifest.templates_dir)
+    rendered = {}
+    for target in manifest.targets:
+        if not target.template:
+            continue
+        content = env.get_template(target.template).render(**palette)
+        dest = Path(apps_dir) / target.name / target.fragment
+        rendered[target.name] = (dest, content)
+    written = {}
+    for name, (dest, content) in rendered.items():
+        _atomic_write(dest, content)
+        written[name] = dest
+    return written
+
+
+def write_block(config_path, fragment_text: str) -> None:
+    """Replace the adorn-managed block in config_path with fragment_text.
+
+    Appends a fresh block if the markers are absent; creates the file if missing.
+    The user's surrounding (structural) config is preserved untouched.
+    """
+    path = Path(config_path)
+    block = f"{MARKER_BEGIN}\n{fragment_text.rstrip(chr(10))}\n{MARKER_END}\n"
+    if path.exists():
+        text = path.read_text(encoding="utf-8")
+        if MARKER_BEGIN in text and MARKER_END in text:
+            pre = text[: text.index(MARKER_BEGIN)]
+            post = text[text.index(MARKER_END) + len(MARKER_END):].lstrip("\n")
+            new = pre + block + post
+        else:
+            new = text.rstrip("\n") + "\n\n" + block
+    else:
+        new = block
+    _atomic_write(path, new)

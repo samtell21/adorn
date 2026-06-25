@@ -20,6 +20,7 @@ command = "swaymsg output '*' bg {path} fill"
 [[target]]
 name = "kitty"
 template = "kitty.conf.tmpl"
+fragment = "colors.conf"
 output = "~/.config/kitty/colors.conf"
 reload = "kitty @ set-colors --all ~/.config/kitty/colors.conf"
 """
@@ -44,6 +45,8 @@ def test_load_parses_targets_and_sections(tmp_path):
     assert t.template == "kitty.conf.tmpl"
     assert t.reload.startswith("kitty @ set-colors")
     assert str(t.output) == str(Path.home() / ".config/kitty/colors.conf")
+    assert t.fragment == "colors.conf"
+    assert t.via == "current"
 
 
 def test_extract_defaults_when_absent(tmp_path):
@@ -63,7 +66,8 @@ def test_no_targets_raises(tmp_path):
         manifest.load(_write(tmp_path, "[mood]\nbg_lightness = 0.07\n"))
 
 
-def test_target_missing_output_raises(tmp_path):
-    text = '[[target]]\nname = "x"\ntemplate = "x.tmpl"\n'
-    with pytest.raises(ValueError, match="output"):
-        manifest.load(_write(tmp_path, text))
+def test_target_defaults_via_current_and_optional_output(tmp_path):
+    text = '[[target]]\nname = "x"\ntemplate = "x.tmpl"\nfragment = "c"\n'
+    m = manifest.load(_write(tmp_path, text))
+    assert m.targets[0].via == "current"
+    assert m.targets[0].output is None

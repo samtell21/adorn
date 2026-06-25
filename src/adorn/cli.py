@@ -26,8 +26,12 @@ def main(argv=None) -> int:
     p_new.add_argument("name")
     p_new.add_argument("wallpaper")
     p_new.add_argument("--no-apply", action="store_true")
+    p_new.add_argument("--saturation", type=float, default=None,
+                       help="hue saturation floor 0..1 (default: manifest [mood] or 0.0)")
     p_recompile = sub.add_parser("recompile", help="recompile palette from wallpaper")
     p_recompile.add_argument("name")
+    p_recompile.add_argument("--saturation", type=float, default=None,
+                             help="hue saturation floor 0..1")
     p_preview = sub.add_parser("preview", help="print a theme's palette as swatches")
     p_preview.add_argument("name")
 
@@ -41,9 +45,10 @@ def main(argv=None) -> int:
     elif args.command == "apply":
         commands.cmd_apply(root, args.name)
     elif args.command == "new":
-        commands.cmd_new(root, args.name, args.wallpaper, do_apply=not args.no_apply)
+        commands.cmd_new(root, args.name, args.wallpaper,
+                         do_apply=not args.no_apply, saturation_floor=args.saturation)
     elif args.command == "recompile":
-        commands.cmd_recompile(root, args.name)
+        commands.cmd_recompile(root, args.name, saturation_floor=args.saturation)
     elif args.command == "preview":
         commands.cmd_preview(root, args.name)
     return 0

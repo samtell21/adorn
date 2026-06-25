@@ -87,3 +87,27 @@ def test_cli_list_and_current(tmp_path, capsys):
     assert "* test" in capsys.readouterr().out
     cli.main(["--root", str(tmp_path), "current"])
     assert "test" in capsys.readouterr().out
+
+
+def test_new_with_saturation_floor_and_stats(tmp_path, capsys):
+    build_catalog(tmp_path)
+    wp = tmp_path / "src.png"
+    make_wallpaper(wp)
+    commands.cmd_new(tmp_path, "pop", str(wp), saturation_floor=0.5)
+    out = capsys.readouterr().out
+    assert "compiled 'pop'" in out
+    assert "sat floor   0.50" in out
+    # the floor lifted the hue roles in the saved palette
+    from adorn import color
+    pal = palette.load(catalog.theme_paths(tmp_path, "pop").palette)
+    assert color.hsl(pal["red"])[1] >= 0.45
+
+
+def test_cli_new_saturation_flag(tmp_path):
+    build_catalog(tmp_path)
+    wp = tmp_path / "src.png"
+    make_wallpaper(wp)
+    cli.main(["--root", str(tmp_path), "new", "v", str(wp), "--no-apply", "--saturation", "0.4"])
+    from adorn import color
+    pal = palette.load(catalog.theme_paths(tmp_path, "v").palette)
+    assert color.hsl(pal["red"])[1] >= 0.35

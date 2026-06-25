@@ -46,20 +46,24 @@ def cmd_apply(root, name) -> None:
     catalog.set_current(root, name)
 
 
-def cmd_new(root, name, wallpaper, do_apply=True) -> None:
+def cmd_new(root, name, wallpaper, do_apply=True, saturation_floor=None) -> None:
     manifest = load_manifest(root)
     theme_dir = catalog.new_theme_dir(root, name)
     dest = theme_dir / ("wallpaper" + Path(wallpaper).suffix)
     shutil.copy(wallpaper, dest)
-    (theme_dir / "overrides.toml").write_text("# per-theme color/role overrides\n", encoding="utf-8")
-    compile_mod.compile_theme(root, name, manifest)
+    (theme_dir / "overrides.toml").write_text(
+        "# per-theme color/role overrides\n", encoding="utf-8"
+    )
+    result = compile_mod.compile_theme(root, name, manifest, saturation_floor=saturation_floor)
+    print(compile_mod.format_stats(name, result))
     if do_apply:
         cmd_apply(root, name)
 
 
-def cmd_recompile(root, name) -> None:
+def cmd_recompile(root, name, saturation_floor=None) -> None:
     manifest = load_manifest(root)
-    compile_mod.compile_theme(root, name, manifest)
+    result = compile_mod.compile_theme(root, name, manifest, saturation_floor=saturation_floor)
+    print(compile_mod.format_stats(name, result))
 
 
 def cmd_preview(root, name) -> None:

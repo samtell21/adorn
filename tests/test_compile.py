@@ -63,9 +63,9 @@ def test_compile_theme_writes_palette(tmp_path):
     img = d / "wallpaper.png"
     subprocess.run(f"magick -size 16x16 xc:#9b9e61 {img}", shell=True, check=True)
     m = fake_manifest()
-    p = compile_mod.compile_theme(tmp_path, "t", m)
+    result = compile_mod.compile_theme(tmp_path, "t", m)
     assert (d / "palette.toml").exists()
-    assert "accent" in p and "bg" in p and "grad" in p
+    assert "accent" in result.palette and "bg" in result.palette and "grad" in result.palette
 
 
 def test_mood_saturation_empty_returns_zero():

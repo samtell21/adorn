@@ -1,6 +1,8 @@
 import subprocess
 import types
 
+import pytest
+
 from adorn import catalog, color, compile as compile_mod
 from adorn.manifest import DEFAULT_EXTRACT
 
@@ -88,3 +90,13 @@ def test_format_stats_contains_key_fields():
     assert "hue sat" in s
     assert "#9b9e61" in s  # accent shown
     assert "red" in s and "#cc6666" in s
+
+
+def test_build_palette_rejects_floor_above_one():
+    with pytest.raises(ValueError, match=r"\[0.0, 1.0\]"):
+        compile_mod.build_palette(RAW, fake_manifest(), saturation_floor=1.5)
+
+
+def test_build_palette_rejects_negative_floor():
+    with pytest.raises(ValueError, match=r"\[0.0, 1.0\]"):
+        compile_mod.build_palette(RAW, fake_manifest(), saturation_floor=-0.1)

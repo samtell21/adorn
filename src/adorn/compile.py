@@ -46,6 +46,8 @@ def build_palette(raw: list[str], manifest, *, saturation_floor=None) -> dict:
     bg_l = manifest.mood.get("bg_lightness", 0.07)
     if saturation_floor is None:
         saturation_floor = manifest.mood.get("hue_saturation_floor", 0.0)
+    if not 0.0 <= saturation_floor <= 1.0:
+        raise ValueError(f"saturation floor must be in [0.0, 1.0], got {saturation_floor}")
 
     sat = max(saturation_floor, min(1.0, mood_saturation(raw) * strength))
     # most-saturated raw color is the wallpaper's signature; max() picks the
@@ -106,7 +108,7 @@ def format_stats(name: str, result: CompileResult) -> str:
         f"  wallpaper   {result.wallpaper}",
         f"  raw colors  {len(result.raw)} extracted",
         f"  mood sat    {result.mood_saturation:.2f}   (avg saturation of the wallpaper)",
-        f"  sat floor   {result.saturation_floor:.2f}   (--saturation)",
+        f"  sat floor   {result.saturation_floor:.2f}   (--saturation / [mood])",
         f"  hue sat     {result.effective_saturation:.2f}   (effective = clamp(mood*strength, floor, 1.0))",
         f"  accent      {p['accent']}   {hsl_str(p['accent'])}   (image-derived)",
         f"  bg {p['bg']}   fg {p['fg']}",

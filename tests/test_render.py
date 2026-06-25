@@ -65,3 +65,13 @@ def test_write_block_preserves_surrounding(tmp_path):
     render.write_block(cfg, "new=val")
     text = cfg.read_text()
     assert "A=1" in text and "B=2" in text and "new=val" in text and "old" not in text
+
+
+def test_write_block_keeps_blank_separator_on_reapply(tmp_path):
+    cfg = tmp_path / "c"
+    cfg.write_text(f"A=1\n{render.MARKER_BEGIN}\nold\n{render.MARKER_END}\n\n[next]\nB=2\n", encoding="utf-8")
+    render.write_block(cfg, "x=1")
+    render.write_block(cfg, "x=2")  # re-apply
+    text = cfg.read_text()
+    assert "\n\n[next]" in text   # blank line before [next] preserved
+    assert "B=2" in text and "x=2" in text and "old" not in text

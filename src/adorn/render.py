@@ -57,7 +57,7 @@ def write_block(config_path, fragment_text: str) -> None:
         text = path.read_text(encoding="utf-8")
         if MARKER_BEGIN in text and MARKER_END in text:
             pre = text[: text.index(MARKER_BEGIN)]
-            post = text[text.index(MARKER_END) + len(MARKER_END):].lstrip("\n")
+            post = text[text.index(MARKER_END) + len(MARKER_END):].removeprefix("\n")
             new = pre + block + post
         else:
             new = text.rstrip("\n") + "\n\n" + block

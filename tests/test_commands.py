@@ -99,3 +99,58 @@ def test_cli_render_subcommand(tmp_path):
     wp = tmp_path / "src.png"; make_wallpaper(wp)
     cli.main(["--root", str(tmp_path), "new", "t", str(wp), "--no-apply"])
     assert cli.main(["--root", str(tmp_path), "render", "t"]) == 0
+
+
+def test_effective_palette_merges(tmp_path):
+    build_catalog(tmp_path)
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    commands.cmd_new(tmp_path, "t", str(wp), do_apply=False)
+    tp = catalog.theme_paths(tmp_path, "t")
+    palette.dump({"bg": "#000000"}, tp.overrides)
+    eff = commands.effective_palette(tmp_path, "t")
+    assert eff["bg"] == "#000000"
+    assert "accent" in eff
+
+
+def test_cli_list_and_current(tmp_path, capsys):
+    build_catalog(tmp_path)
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    cli.main(["--root", str(tmp_path), "new", "t", str(wp), "--no-apply"])
+    cli.main(["--root", str(tmp_path), "apply", "t"])
+    capsys.readouterr()
+    cli.main(["--root", str(tmp_path), "list"])
+    assert "* t" in capsys.readouterr().out
+    cli.main(["--root", str(tmp_path), "current"])
+    assert "t" in capsys.readouterr().out
+
+
+def test_new_with_saturation_floor_and_stats(tmp_path, capsys):
+    from adorn import color
+    build_catalog(tmp_path)
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    commands.cmd_new(tmp_path, "pop", str(wp), do_apply=False, saturation_floor=0.5)
+    out = capsys.readouterr().out
+    assert "compiled 'pop'" in out
+    assert "sat floor   0.50" in out
+    pal = palette.load(catalog.theme_paths(tmp_path, "pop").palette)
+    assert color.hsl(pal["red"])[1] >= 0.45
+
+
+def test_cli_new_saturation_flag(tmp_path):
+    from adorn import color
+    build_catalog(tmp_path)
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    cli.main(["--root", str(tmp_path), "new", "v", str(wp), "--no-apply", "--saturation", "0.4"])
+    pal = palette.load(catalog.theme_paths(tmp_path, "v").palette)
+    assert color.hsl(pal["red"])[1] >= 0.35
+
+
+def test_apply_bootstraps_apps_if_missing(tmp_path):
+    import shutil
+    build_catalog(tmp_path)
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    commands.cmd_new(tmp_path, "t", str(wp), do_apply=False)
+    apps = catalog.theme_paths(tmp_path, "t").dir / "apps"
+    shutil.rmtree(apps)                 # simulate a theme with no apps/ yet
+    commands.cmd_apply(tmp_path, "t")
+    assert (apps / "waybar" / "colors.css").exists()  # apply re-materialized

@@ -66,6 +66,46 @@ def cmd_recompile(root, name, saturation_floor=None) -> None:
     print(compile_mod.format_stats(name, result))
 
 
+STARTER_MANIFEST = '''# adorn manifest — declares which apps adorn themes.
+
+[extract]
+command = "magick {path} -resize 10% -colors 16 -depth 8 -format %c histogram:info:-"
+
+[wallpaper]
+# command = "swaymsg output '*' bg {path} fill"
+
+[mood]
+saturation_strength = 1.0
+hue_saturation_floor = 0.0   # raise (e.g. 0.30) for more saturated semantic colors
+bg_lightness = 0.07
+
+[ramp]
+name = "grad"
+length = 7
+hues = [300, 250, 215, 175, 120, 60, 40]
+
+# One [[target]] per app. Example:
+# [[target]]
+# name = "kitty"
+# template = "kitty.conf.tmpl"          # lives in templates/
+# output = "~/.config/kitty/colors.conf"
+# reload = "kitty @ set-colors --all ~/.config/kitty/colors.conf"
+'''
+
+
+def cmd_init(root) -> None:
+    root = Path(root)
+    manifest_path = root / "adorn.toml"
+    if manifest_path.exists():
+        raise FileExistsError(f"adorn config already exists at {manifest_path}")
+    (root / "templates").mkdir(parents=True, exist_ok=True)
+    (root / "themes").mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(STARTER_MANIFEST, encoding="utf-8")
+    print(f"created adorn config at {root}")
+    print(f"  edit {manifest_path} — add a [[target]] per app")
+    print(f"  put templates in {root / 'templates'}")
+
+
 def cmd_preview(root, name) -> None:
     palette = effective_palette(root, name)
     for key, value in palette.items():

@@ -36,6 +36,10 @@ class Manifest:
 
 def load(path) -> Manifest:
     path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"no adorn manifest at {path} — run 'adorn init' to create one, or pass --root"
+        )
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     root = path.parent
 

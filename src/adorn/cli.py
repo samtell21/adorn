@@ -2,6 +2,7 @@
 """adorn command-line entry point."""
 import argparse
 import os
+import sys
 from pathlib import Path
 
 from . import __version__, commands
@@ -34,23 +35,30 @@ def main(argv=None) -> int:
                              help="hue saturation floor 0..1")
     p_preview = sub.add_parser("preview", help="print a theme's palette as swatches")
     p_preview.add_argument("name")
+    sub.add_parser("init", help="scaffold a starter ~/.config/adorn config")
 
     args = parser.parse_args(argv)
     root = Path(args.root) if args.root else DEFAULT_ROOT
 
-    if args.command == "list":
-        commands.cmd_list(root)
-    elif args.command == "current":
-        commands.cmd_current(root)
-    elif args.command == "apply":
-        commands.cmd_apply(root, args.name)
-    elif args.command == "new":
-        commands.cmd_new(root, args.name, args.wallpaper,
-                         do_apply=not args.no_apply, saturation_floor=args.saturation)
-    elif args.command == "recompile":
-        commands.cmd_recompile(root, args.name, saturation_floor=args.saturation)
-    elif args.command == "preview":
-        commands.cmd_preview(root, args.name)
+    try:
+        if args.command == "list":
+            commands.cmd_list(root)
+        elif args.command == "current":
+            commands.cmd_current(root)
+        elif args.command == "apply":
+            commands.cmd_apply(root, args.name)
+        elif args.command == "new":
+            commands.cmd_new(root, args.name, args.wallpaper,
+                             do_apply=not args.no_apply, saturation_floor=args.saturation)
+        elif args.command == "recompile":
+            commands.cmd_recompile(root, args.name, saturation_floor=args.saturation)
+        elif args.command == "preview":
+            commands.cmd_preview(root, args.name)
+        elif args.command == "init":
+            commands.cmd_init(root)
+    except (FileNotFoundError, FileExistsError, ValueError) as e:
+        print(f"adorn: {e}", file=sys.stderr)
+        return 1
     return 0
 
 

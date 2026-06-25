@@ -136,12 +136,22 @@ wallpaper is managed *in the fragments*: the sway fragment carries
 `output * bg {{ wallpaper }} fill` (surviving `swaymsg reload`) and swaylock
 carries `image={{ wallpaper }}`. No separate wallpaper-setting command needed.
 
-**Named schemes.** `templates/` becomes `schemes/<scheme>/` (a set of templates =
-a role→app mapping). A theme records its scheme in `themes/<name>/theme.toml`
-(`scheme = "default"`). `new --scheme X` selects it; `render` reads it to resolve
-`schemes/X/`. Unspecified → `default`. Schemes let one role map differently per
-scheme (e.g. kitty `color1` = red in one, yellow in another) independent of the
-per-theme palette.
+**Named schemes (templates + color system).** `templates/` becomes
+`schemes/<scheme>/`. A scheme owns BOTH the template set AND the color
+definition:
+- template files (`*.tmpl`) — the role→app mapping (kitty `color1` = red in one
+  scheme, yellow in another);
+- `schemes/<scheme>/scheme.toml` — the **color derivation**: `[mood]`
+  (saturation_strength, hue_saturation_floor, bg_lightness), `[ramp]`, `[hues]`
+  (per-role canonical hue overrides), and optional `[fixed]` (roles pinned to a
+  literal hex regardless of wallpaper).
+
+So a scheme is a complete color *system*; a theme instantiates it by running its
+wallpaper through that scheme's derivation. The global `adorn.toml` keeps only
+`[extract]` and the `[[target]]`s (which apps + delivery); the color knobs live
+per-scheme. A theme records its scheme in `themes/<name>/theme.toml`
+(`scheme = "default"`); `new --scheme X` selects it; unspecified → `default`. The
+`default` scheme carries today's values. (Still knobs + fixed roles, not a DSL.)
 
 ## Palette schema (roles)
 

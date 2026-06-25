@@ -1,3 +1,4 @@
+import shlex
 import types
 
 from adorn import reload as reload_mod
@@ -37,3 +38,16 @@ def test_set_wallpaper_substitutes_path(tmp_path):
 def test_set_wallpaper_none_is_noop():
     m = types.SimpleNamespace(wallpaper_command=None)
     reload_mod.set_wallpaper(m, "/whatever.jpg")  # no error
+
+
+def test_set_wallpaper_quotes_path_with_metachars(tmp_path):
+    # a wallpaper path containing a shell metacharacter must not inject a command
+    sentinel = tmp_path / "PWNED"
+    evil = tmp_path / f"a; touch {sentinel} #.jpg"
+    rec = tmp_path / "rec"
+    # the wallpaper command writes the (quoted) path to rec; injection would create sentinel
+    m = types.SimpleNamespace(wallpaper_command=f"echo {{path}} > {rec}")
+    reload_mod.set_wallpaper(m, evil)
+    assert not sentinel.exists()            # injection did NOT execute
+    # the path appears in output, but as a quoted string (not executed)
+    assert str(evil) in rec.read_text()

@@ -310,4 +310,195 @@ and pass `scheme=args.scheme` in the `cmd_new(...)` dispatch call.
 
 ---
 
-### Task 19: `adorn alter` (write just-in-time after Task 18)
+### Task 19: `adorn alter` — pastel pipelines over theme colors
+
+**Files:**
+- Modify: `src/adorn/commands.py` (`cmd_alter`)
+- Modify: `src/adorn/cli.py` (`alter` subcommand)
+- Test: `tests/test_alter.py` (new)
+
+**Interfaces:**
+- `commands.cmd_alter(root, name, colors, write, command) -> None`
+  - `colors`: list[str] of role names, or `None` for all
+  - `write`: bool
+  - `command`: list[str] — the pastel command tokens (`+role` tokens expand to that role's hex)
+- `cli`: `adorn alter <name> [-c roles] [-w] <pastel cmd…>`
+
+- [ ] **Step 1: Write failing tests (`tests/test_alter.py`)**
+
+```python
+import subprocess
+import pytest
+from adorn import catalog, cli, commands, palette
+
+
+def setup_theme(tmp_path):
+    (tmp_path / "schemes" / "default").mkdir(parents=True)
+    (tmp_path / "schemes" / "default" / "w.tmpl").write_text("bg {{ bg }}\n")
+    (tmp_path / "adorn.toml").write_text(
+        '[mood]\nbg_lightness=0.07\n[ramp]\nname="grad"\nlength=7\nhues=[300,215,175,120,40]\n'
+        '[[target]]\nname="waybar"\ntemplate="w.tmpl"\nfragment="colors.css"\n'
+    )
+    wp = tmp_path / "src.png"
+    subprocess.run(f"magick -size 16x16 xc:#9b9e61 {wp}", shell=True, check=True)
+    commands.cmd_new(tmp_path, "t", str(wp), do_apply=False)
+    return tmp_path
+
+
+def test_alter_saturate_single_prints_mapping(tmp_path, capsys):
+    setup_theme(tmp_path)
+    commands.cmd_alter(tmp_path, "t", ["red"], False, ["saturate", "0.5"])
+    out = capsys.readouterr().out
+    assert "red" in out and "->" in out
+    # not written
+    assert "red" not in palette.load(catalog.theme_paths(tmp_path, "t").overrides)
+
+
+def test_alter_write_scalar_to_overrides(tmp_path):
+    setup_theme(tmp_path)
+    commands.cmd_alter(tmp_path, "t", ["accent"], True, ["lighten", "0.1"])
+    over = palette.load(catalog.theme_paths(tmp_path, "t").overrides)
+    assert "accent" in over and over["accent"].startswith("#")
+
+
+def test_alter_plus_sigil_references_role(tmp_path, capsys):
+    setup_theme(tmp_path)
+    commands.cmd_alter(tmp_path, "t", ["accent"], False, ["mix", "+magenta"])
+    assert "accent" in capsys.readouterr().out
+
+
+def test_alter_all_colors_saturate(tmp_path, capsys):
+    setup_theme(tmp_path)
+    commands.cmd_alter(tmp_path, "t", None, False, ["saturate", "0.1"])
+    assert capsys.readouterr().out.count("->") >= 10   # one per palette color incl grad0..6
+
+
+def test_alter_mismatch_is_error(tmp_path):
+    setup_theme(tmp_path)
+    with pytest.raises(ValueError, match="produced"):
+        commands.cmd_alter(tmp_path, "t", None, False, ["color", "#111111"])  # 1 out for N>1
+
+
+def test_alter_unknown_role_errors(tmp_path):
+    setup_theme(tmp_path)
+    with pytest.raises(ValueError, match="unknown"):
+        commands.cmd_alter(tmp_path, "t", ["nope"], False, ["saturate", "0.1"])
+
+
+def test_alter_write_ramp_entry_rebuilds_list(tmp_path):
+    setup_theme(tmp_path)
+    commands.cmd_alter(tmp_path, "t", ["grad0"], True, ["saturate", "0.2"])
+    over = palette.load(catalog.theme_paths(tmp_path, "t").overrides)
+    assert isinstance(over["grad"], list) and len(over["grad"]) == 7
+
+
+def test_cli_alter(tmp_path):
+    setup_theme(tmp_path)
+    assert cli.main(["--root", str(tmp_path), "alter", "t", "-c", "red", "saturate", "0.3"]) == 0
+```
+
+- [ ] **Step 2: Run (RED).** `.venv/bin/pytest tests/test_alter.py -v` → `cmd_alter` undefined.
+
+- [ ] **Step 3: `commands.py` — add `cmd_alter`** (add `import re` and `import subprocess` at top — re-add subprocess; NO shell, so no `shlex` needed):
+
+```python
+def cmd_alter(root, name, colors, write, command) -> None:
+    if not command:
+        raise ValueError("no pastel command given")
+    palette = effective_palette(root, name)
+
+    # flatten palette into selectable colors (ramp -> grad0..gradN)
+    selectable = {}
+    for k, v in palette.items():
+        if isinstance(v, list):
+            for i, c in enumerate(v):
+                selectable[f"{k}{i}"] = c
+        else:
+            selectable[k] = v
+
+    if colors:
+        for c in colors:
+            if c not in selectable:
+                raise ValueError(f"unknown color role: {c}")
+        selected = list(colors)
+    else:
+        selected = list(selectable.keys())
+
+    # expand +role sigils in the command
+    expanded = []
+    for tok in command:
+        if tok.startswith("+"):
+            role = tok[1:]
+            if role not in selectable:
+                raise ValueError(f"unknown color role in +{role}")
+            expanded.append(selectable[role])
+        else:
+            expanded.append(tok)
+
+    stdin = "".join(selectable[s] + "\n" for s in selected)
+    # run `pastel <expanded>` then normalize via `pastel format hex`.
+    # argv lists + NO shell: user tokens can't inject (a token like ";rm" is just
+    # a literal pastel argument, which pastel rejects).
+    step = subprocess.run(
+        ["pastel", *expanded], input=stdin, capture_output=True, text=True, check=True
+    )
+    norm = subprocess.run(
+        ["pastel", "format", "hex"], input=step.stdout, capture_output=True, text=True, check=True
+    )
+    results = [ln.strip().lower() for ln in norm.stdout.splitlines() if ln.strip()]
+    if len(results) != len(selected):
+        raise ValueError(
+            f"pastel produced {len(results)} color(s) for {len(selected)} selected — "
+            f"refusing an ambiguous mapping (set multiple colors with separate calls)"
+        )
+
+    for role, newc in zip(selected, results):
+        print(f"{role:<14} {selectable[role]} -> {newc}")
+
+    if write:
+        tp = catalog.theme_paths(root, name)
+        overrides = palette_mod.load(tp.overrides)
+        ramp_name, ramp_list = None, None
+        for role, newc in zip(selected, results):
+            m = re.fullmatch(r"([a-zA-Z_]+)(\d+)", role)
+            if m and isinstance(palette.get(m.group(1)), list):
+                base, idx = m.group(1), int(m.group(2))
+                if ramp_list is None:
+                    ramp_name, ramp_list = base, list(palette[base])
+                ramp_list[idx] = newc
+            else:
+                overrides[role] = newc
+        if ramp_list is not None:
+            overrides[ramp_name] = ramp_list
+        palette_mod.dump(overrides, tp.overrides)
+        print(f"wrote {len(selected)} override(s) to {tp.overrides}")
+```
+
+- [ ] **Step 4: `cli.py` — `alter` subcommand**
+
+```python
+    p_alter = sub.add_parser("alter", help="run a pastel pipeline over a theme's colors")
+    p_alter.add_argument("name")
+    p_alter.add_argument("-c", "--color", default=None,
+                         help="comma-separated roles (default: all)")
+    p_alter.add_argument("-w", "--write", action="store_true",
+                         help="write results to the theme's overrides.toml")
+    p_alter.add_argument("command", nargs=argparse.REMAINDER,
+                         help="pastel command; use +role to reference a color")
+```
+Dispatch:
+```python
+        elif args.command == "alter":
+            roles = args.color.split(",") if args.color else None
+            commands.cmd_alter(root, args.name, roles, args.write, args.command)
+```
+(`args.command` here is the subparser dest for `alter`'s positional REMAINDER. NOTE the top-level subparser dest is also `command` — rename the alter REMAINDER dest to avoid collision: use `p_alter.add_argument("pastel", nargs=argparse.REMAINDER, ...)` and dispatch with `args.pastel`. Verify the top-level `dest="command"` from `add_subparsers(dest="command")` isn't shadowed.)
+
+- [ ] **Step 5: Run full suite.** `.venv/bin/pytest -q` → all pass (80 + 8 new = 88). If REMAINDER captures `-c/-w` when they appear before the command, confirm the test `test_cli_alter` (options before command) passes; if argparse mis-binds, document and adjust (e.g. require options before the command, which the tests follow).
+
+- [ ] **Step 6: Commit** `git commit -am "feat: adorn alter — pastel pipelines over theme colors (+role sigil, -c/-w, 1:1 mapping)"`
+
+## Self-Review (Task 19)
+- pastel pipeline over selected/all colors, +role expansion, 1:1 M==N enforcement, -w to overrides (incl ramp rebuild) → tested across 8 cases. ✓
+- unknown role + ambiguous-mapping errors → tested. ✓
+- CLI -c/-w/REMAINDER → tested. ✓

@@ -5,9 +5,9 @@ from adorn import catalog, cli, commands, palette
 
 
 def build_catalog(root):
-    (root / "templates").mkdir(parents=True)
-    (root / "templates" / "waybar.tmpl").write_text("bg {{ bg }}\naccent {{ accent }}\n")
-    (root / "templates" / "sway.tmpl").write_text("output * bg {{ wallpaper }} fill\n")
+    (root / "schemes" / "default").mkdir(parents=True)
+    (root / "schemes" / "default" / "waybar.tmpl").write_text("bg {{ bg }}\naccent {{ accent }}\n")
+    (root / "schemes" / "default" / "sway.tmpl").write_text("output * bg {{ wallpaper }} fill\n")
     (root / "adorn.toml").write_text(
         """
 [mood]
@@ -147,6 +147,30 @@ def test_apply_bootstraps_apps_if_missing(tmp_path):
     shutil.rmtree(apps)                 # simulate a theme with no apps/ yet
     commands.cmd_apply(tmp_path, "t")
     assert (apps / "waybar" / "colors.css").exists()  # apply re-materialized
+
+
+def test_new_records_scheme_and_uses_it(tmp_path):
+    build_catalog(tmp_path)
+    # add an alternate scheme that maps waybar bg to {{ accent }} instead of {{ bg }}
+    alt = tmp_path / "schemes" / "alt"; alt.mkdir(parents=True)
+    (alt / "waybar.tmpl").write_text("bg {{ accent }}\n")
+    (alt / "sway.tmpl").write_text("output * bg {{ wallpaper }} fill\n")
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    commands.cmd_new(tmp_path, "t", str(wp), do_apply=False, scheme="alt")
+    import tomllib
+    meta = tomllib.loads((catalog.theme_paths(tmp_path, "t").dir / "theme.toml").read_text())
+    assert meta["scheme"] == "alt"
+    frag = (catalog.theme_paths(tmp_path, "t").dir / "apps" / "waybar" / "colors.css").read_text()
+    pal = palette.load(catalog.theme_paths(tmp_path, "t").palette)
+    assert pal["accent"] in frag        # used the alt scheme's template
+
+
+def test_default_scheme_when_unspecified(tmp_path):
+    from adorn import commands as C
+    build_catalog(tmp_path)
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    C.cmd_new(tmp_path, "t", str(wp), do_apply=False)   # no scheme -> default
+    assert (catalog.theme_paths(tmp_path, "t").dir / "apps" / "waybar" / "colors.css").exists()
 
 
 def test_preview_renders_ansi_swatches(tmp_path, capsys):

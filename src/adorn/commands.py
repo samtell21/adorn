@@ -1,6 +1,7 @@
 # src/adorn/commands.py
 """High-level commands wiring the modules together."""
 import shutil
+import tomllib
 from pathlib import Path
 
 from . import catalog
@@ -33,11 +34,19 @@ def cmd_current(root) -> None:
     print(catalog.current_theme(root) or "(none)")
 
 
+def theme_scheme(theme_paths) -> str:
+    meta = theme_paths.meta
+    if meta.exists():
+        return tomllib.loads(meta.read_text(encoding="utf-8")).get("scheme", "default")
+    return "default"
+
+
 def render_theme(root, name, manifest) -> None:
     tp = catalog.theme_paths(root, name)
+    scheme_dir = manifest.schemes_dir / theme_scheme(tp)
     context = dict(effective_palette(root, name))
     context["wallpaper"] = str(tp.wallpaper)
-    render_mod.materialize(manifest, context, tp.dir / "apps")
+    render_mod.materialize(manifest, context, tp.dir / "apps", scheme_dir)
 
 
 def cmd_render(root, name) -> None:
@@ -57,7 +66,7 @@ def cmd_apply(root, name) -> None:
     reload_mod.set_wallpaper(manifest, tp.wallpaper)
 
 
-def cmd_new(root, name, wallpaper, do_apply=True, saturation_floor=None) -> None:
+def cmd_new(root, name, wallpaper, do_apply=True, saturation_floor=None, scheme="default") -> None:
     manifest = load_manifest(root)
     theme_dir = catalog.new_theme_dir(root, name)
     dest = theme_dir / ("wallpaper" + Path(wallpaper).suffix)
@@ -65,6 +74,7 @@ def cmd_new(root, name, wallpaper, do_apply=True, saturation_floor=None) -> None
     (theme_dir / "overrides.toml").write_text(
         "# per-theme color/role overrides\n", encoding="utf-8"
     )
+    (theme_dir / "theme.toml").write_text(f'scheme = "{scheme}"\n', encoding="utf-8")
     result = compile_mod.compile_theme(root, name, manifest, saturation_floor=saturation_floor)
     render_theme(root, name, manifest)
     print(compile_mod.format_stats(name, result))

@@ -19,7 +19,7 @@ class Target:
 @dataclass(frozen=True)
 class Manifest:
     root: Path
-    templates_dir: Path
+    schemes_dir: Path
     themes_dir: Path
     extract_command: str
     wallpaper_command: str | None
@@ -57,7 +57,7 @@ def load(path) -> Manifest:
 
     return Manifest(
         root=root,
-        templates_dir=root / "templates",
+        schemes_dir=root / "schemes",
         themes_dir=root / "themes",
         extract_command=data.get("extract", {}).get("command", DEFAULT_EXTRACT),
         wallpaper_command=data.get("wallpaper", {}).get("command"),

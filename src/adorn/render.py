@@ -20,13 +20,13 @@ def _atomic_write(path: Path, content: str) -> None:
     os.replace(tmp, path)
 
 
-def materialize(manifest, context: dict, apps_dir) -> dict:
+def materialize(manifest, context: dict, apps_dir, templates_dir) -> dict:
     """Render each target with a template into apps_dir/<target>/<fragment>.
 
     Returns {target_name: written_path}. Raises (before writing anything more)
     on a missing role, so a bad template can't leave a half-materialized set.
     """
-    env = make_env(manifest.templates_dir)
+    env = make_env(templates_dir)
     rendered = {}
     for target in manifest.targets:
         if not target.template:

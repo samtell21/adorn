@@ -3,7 +3,7 @@ import os
 from collections import namedtuple
 from pathlib import Path
 
-ThemePaths = namedtuple("ThemePaths", "dir wallpaper palette overrides files")
+ThemePaths = namedtuple("ThemePaths", "dir wallpaper palette overrides files meta")
 
 
 def themes_dir(root) -> Path:
@@ -45,6 +45,7 @@ def theme_paths(root, name) -> ThemePaths:
         palette=d / "palette.toml",
         overrides=d / "overrides.toml",
         files=d / "files",
+        meta=d / "theme.toml",
     )
 
 

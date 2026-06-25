@@ -29,6 +29,7 @@ def main(argv=None) -> int:
     p_new.add_argument("--no-apply", action="store_true")
     p_new.add_argument("--saturation", type=float, default=None,
                        help="hue saturation floor 0..1 (default: manifest [mood] or 0.0)")
+    p_new.add_argument("--scheme", default="default")
     p_recompile = sub.add_parser("recompile", help="recompile palette from wallpaper")
     p_recompile.add_argument("name")
     p_recompile.add_argument("--saturation", type=float, default=None,
@@ -51,7 +52,8 @@ def main(argv=None) -> int:
             commands.cmd_apply(root, args.name)
         elif args.command == "new":
             commands.cmd_new(root, args.name, args.wallpaper,
-                             do_apply=not args.no_apply, saturation_floor=args.saturation)
+                             do_apply=not args.no_apply, saturation_floor=args.saturation,
+                             scheme=args.scheme)
         elif args.command == "render":
             commands.cmd_render(root, args.name)
         elif args.command == "recompile":

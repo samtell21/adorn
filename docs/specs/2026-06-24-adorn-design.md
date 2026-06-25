@@ -114,11 +114,34 @@ rewrites the user's structural config.
 - `zathura/zathurarc` → `include ~/.config/adorn/current/apps/zathura/colors`
 - `nvim`           → `dofile`/`require` of `…/current/apps/nvim/palette.lua`
 
-**Forced fallback — swaylock** has no include mechanism. apply rewrites a
-delimited block (between `# >>> adorn` / `# <<< adorn` markers) inside the user's
-`~/.config/swaylock/config`, replacing only the color lines and leaving the
-structural settings in place. This is the sole case where adorn writes into a
-real config, and only a marked color region of it.
+**App-specific delivery via plugins (forced fallback).** swaylock has no include
+mechanism, so its colors must be written into its config. Rather than special-case
+this in the engine, adorn leans on the `reload` field: a target's `reload` is just
+a shell command run (after `current` is flipped) at apply time. For swaylock the
+`reload` command IS a plugin script — `~/.config/adorn/plugins/swaylock` — that
+reads the active fragment (`current/apps/swaylock/colors`) and rewrites a delimited
+block (`# >>> adorn` / `# <<< adorn`) in `~/.config/swaylock/config`, preserving
+structural settings.
+
+Plugins live in `~/.config/adorn/plugins/` (user-owned, untouched by `pipx`
+upgrades). A plugin defaults its input (`current/apps/<app>/<file>`) and output
+(the app's known config path) and accepts overrides as args. adorn ships
+`swaylock` as the worked example. The engine has **no** plugin/`via`/block code —
+plugins are simply reload commands, so any app needing bespoke write logic is a
+user script referenced from `reload`.
+
+**Wallpaper as a render variable.** Templates receive `{{ wallpaper }}` (the
+active theme's wallpaper absolute path) alongside the palette roles, so the
+wallpaper is managed *in the fragments*: the sway fragment carries
+`output * bg {{ wallpaper }} fill` (surviving `swaymsg reload`) and swaylock
+carries `image={{ wallpaper }}`. No separate wallpaper-setting command needed.
+
+**Named schemes.** `templates/` becomes `schemes/<scheme>/` (a set of templates =
+a role→app mapping). A theme records its scheme in `themes/<name>/theme.toml`
+(`scheme = "default"`). `new --scheme X` selects it; `render` reads it to resolve
+`schemes/X/`. Unspecified → `default`. Schemes let one role map differently per
+scheme (e.g. kitty `color1` = red in one, yellow in another) independent of the
+per-theme palette.
 
 ## Palette schema (roles)
 
@@ -245,14 +268,34 @@ output   = "~/.config/swaylock/config"   # the file whose marked block is rewrit
 
 ```
 adorn list                                # catalog, * marks current
-adorn new <name> <wallpaper> [--saturation F]  # extract palette + render apps/ fragments, print stats, then apply (--no-apply)
-adorn apply <name>                        # current → theme; swaylock block; reload; set wallpaper (deploys apps/ as-is)
-adorn render <name> [--saturation F]      # re-derive apps/ fragments from palette+overrides (overwrites apps/; for after edits)
+adorn new <name> <wallpaper> [--scheme S] [--saturation F]  # extract palette + render apps/, stats, then apply (--no-apply)
+adorn apply <name>                        # current → theme; reload (incl. plugin reloads); deploys apps/ as-is
+adorn render <name>                       # re-derive apps/ fragments from palette+overrides (overwrites apps/)
+adorn alter <name> [-c roles] [-w] <pastel-cmd…>  # run a pastel pipeline over theme colors (see below)
 adorn current                             # show active theme
-adorn preview <name>                      # print palette as pastel swatches WITHOUT applying
+adorn preview <name>                      # print palette as ANSI truecolor swatches WITHOUT applying
 adorn recompile <name> [--saturation F]   # re-run extraction → palette.toml only (keeps overrides; then `render`)
 adorn edit <name>                         # open overrides.toml in $EDITOR (optional convenience)
 ```
+
+### `adorn alter` — pastel pipelines over theme colors
+
+`adorn alter <theme> [-c role[,role…]] [-w] <pastel command…>` runs a `pastel`
+pipeline against a theme's effective colors.
+
+- **Selection:** `-c/--color role,role` picks colors; absent ⇒ all palette colors
+  (ramp entries as `grad0…gradN`).
+- **`+role` sigil:** any `+role` token in the command is replaced with that role's
+  hex (so a color can be both piped in *and* referenced as an argument).
+- **Execution:** the N selected colors are fed (one hex per line) into the pastel
+  command; pastel emits M colors. **Require M == N**, mapping 1:1 back to the
+  selected colors. M≠N (e.g. `color #111` yields 1 for N>1) is an error — set
+  multiple colors to one value with explicit separate calls.
+- **`-w/--write`:** write the N results to the selected roles in
+  `themes/<theme>/overrides.toml` (then `render` to push into `apps/`).
+
+Examples: `alter volc -c red saturate .5`; `alter volc -c accent -w mix +magenta`;
+`alter volc -w saturate .3` (lift every color).
 
 The key separation: **`render` writes the `apps/` fragments** (from
 palette+overrides), **`apply` deploys them** (symlink + reload). Hand-edits to

@@ -154,3 +154,16 @@ def test_apply_bootstraps_apps_if_missing(tmp_path):
     shutil.rmtree(apps)                 # simulate a theme with no apps/ yet
     commands.cmd_apply(tmp_path, "t")
     assert (apps / "waybar" / "colors.css").exists()  # apply re-materialized
+
+
+def test_preview_renders_ansi_swatches(tmp_path, capsys):
+    build_catalog(tmp_path)
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    commands.cmd_new(tmp_path, "t", str(wp), do_apply=False)
+    capsys.readouterr()
+    commands.cmd_preview(tmp_path, "t")
+    out = capsys.readouterr().out
+    assert "\x1b[48;2;" in out      # ANSI truecolor background = a real swatch
+    assert "bg" in out               # role label present
+    assert "#" in out                # hex shown
+    assert "grad0" in out            # ramp expanded with indices

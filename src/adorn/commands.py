@@ -1,8 +1,6 @@
 # src/adorn/commands.py
 """High-level commands wiring the modules together."""
-import shlex
 import shutil
-import subprocess
 from pathlib import Path
 
 from . import catalog
@@ -130,8 +128,10 @@ def cmd_preview(root, name) -> None:
         colors = value if isinstance(value, list) else [value]
         for i, c in enumerate(colors):
             label = f"{key}{i}" if isinstance(value, list) else key
-            subprocess.run(
-                f"printf '%-16s' {shlex.quote(label)}; "
-                f"pastel color {shlex.quote(c)} | head -n1",
-                shell=True,
-            )
+            try:
+                r, g, b = int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16)
+            except (ValueError, IndexError):
+                print(f"{label:<16}{c}")
+                continue
+            swatch = f"\x1b[48;2;{r};{g};{b}m        \x1b[0m"
+            print(f"{label:<16}{swatch} {c}")

@@ -35,15 +35,31 @@ def cmd_current(root) -> None:
     print(catalog.current_theme(root) or "(none)")
 
 
+def render_theme(root, name, manifest) -> None:
+    pal = effective_palette(root, name)
+    apps_dir = catalog.theme_paths(root, name).dir / "apps"
+    render_mod.materialize(manifest, pal, apps_dir)
+
+
+def cmd_render(root, name) -> None:
+    manifest = load_manifest(root)
+    render_theme(root, name, manifest)
+    print(f"rendered apps/ fragments for '{name}'")
+
+
 def cmd_apply(root, name) -> None:
     manifest = load_manifest(root)
     tp = catalog.theme_paths(root, name)
-    palette = effective_palette(root, name)
-    outputs = render_mod.render_all(manifest, palette, tp.files)
-    render_mod.write_all(outputs)
+    apps_dir = tp.dir / "apps"
+    if not apps_dir.exists():
+        render_theme(root, name, manifest)   # bootstrap a theme that has no apps/ yet
+    catalog.set_current(root, name)
+    for target in manifest.targets:
+        if target.via == "block" and target.output is not None:
+            frag = apps_dir / target.name / target.fragment
+            render_mod.write_block(target.output, frag.read_text(encoding="utf-8"))
     reload_mod.run_reloads(manifest)
     reload_mod.set_wallpaper(manifest, tp.wallpaper)
-    catalog.set_current(root, name)
 
 
 def cmd_new(root, name, wallpaper, do_apply=True, saturation_floor=None) -> None:
@@ -55,6 +71,7 @@ def cmd_new(root, name, wallpaper, do_apply=True, saturation_floor=None) -> None
         "# per-theme color/role overrides\n", encoding="utf-8"
     )
     result = compile_mod.compile_theme(root, name, manifest, saturation_floor=saturation_floor)
+    render_theme(root, name, manifest)
     print(compile_mod.format_stats(name, result))
     if do_apply:
         cmd_apply(root, name)
@@ -64,6 +81,7 @@ def cmd_recompile(root, name, saturation_floor=None) -> None:
     manifest = load_manifest(root)
     result = compile_mod.compile_theme(root, name, manifest, saturation_floor=saturation_floor)
     print(compile_mod.format_stats(name, result))
+    print(f"palette recompiled; run `adorn render {name}` to update apps/")
 
 
 STARTER_MANIFEST = '''# adorn manifest — declares which apps adorn themes.

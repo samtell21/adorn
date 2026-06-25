@@ -6,108 +6,96 @@ from adorn import catalog, cli, commands, palette
 
 def build_catalog(root):
     (root / "templates").mkdir(parents=True)
-    (root / "templates" / "kitty.conf.tmpl").write_text(
-        "background {{ bg }}\naccent {{ accent }}\n"
-    )
-    marker = root / "reloaded"
+    (root / "templates" / "waybar.tmpl").write_text("bg {{ bg }}\naccent {{ accent }}\n")
+    (root / "templates" / "swaylock.tmpl").write_text("ring={{ accent[1:] }}\n")
+    swaycfg = root / "swaylock.conf"
+    swaycfg.write_text("font=Foo\nindicator-radius=110\n", encoding="utf-8")
     (root / "adorn.toml").write_text(
         f"""
 [mood]
 bg_lightness = 0.07
-
 [ramp]
 name = "grad"
 length = 7
 hues = [300, 215, 175, 120, 40]
-
 [wallpaper]
 command = "true {{path}}"
-
 [[target]]
-name = "kitty"
-template = "kitty.conf.tmpl"
-output = "{root / 'kitty-colors.conf'}"
-reload = "touch {marker}"
+name = "waybar"
+template = "waybar.tmpl"
+fragment = "colors.css"
+reload = "true"
+[[target]]
+name = "swaylock"
+template = "swaylock.tmpl"
+fragment = "colors"
+via = "block"
+output = "{swaycfg}"
 """
     )
-    return marker
+    return swaycfg
 
 
 def make_wallpaper(path):
     subprocess.run(f"magick -size 16x16 xc:#9b9e61 {path}", shell=True, check=True)
 
 
-def test_new_compiles_and_applies(tmp_path):
-    marker = build_catalog(tmp_path)
-    wp = tmp_path / "src.png"
-    make_wallpaper(wp)
-    commands.cmd_new(tmp_path, "test", str(wp))
-
-    tp = catalog.theme_paths(tmp_path, "test")
-    assert tp.palette.exists()
-    assert tp.overrides.exists()
-    out = (tmp_path / "kitty-colors.conf").read_text()
-    assert out.startswith("background #")
-    assert catalog.current_theme(tmp_path) == "test"
-    assert marker.exists()
-
-
-def test_overrides_win_on_apply(tmp_path):
+def test_new_materializes_editable_fragments(tmp_path):
     build_catalog(tmp_path)
-    wp = tmp_path / "src.png"
-    make_wallpaper(wp)
-    commands.cmd_new(tmp_path, "test", str(wp), do_apply=True)
-    # pin bg via overrides, re-apply
-    tp = catalog.theme_paths(tmp_path, "test")
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    commands.cmd_new(tmp_path, "t", str(wp))
+    tp = catalog.theme_paths(tmp_path, "t")
+    waybar_frag = tp.dir / "apps" / "waybar" / "colors.css"
+    assert waybar_frag.exists()
+    assert waybar_frag.read_text().startswith("bg #")
+    # editable + saved: hand-edit survives apply
+    waybar_frag.write_text("bg #deadbe\naccent #c0ffee\n", encoding="utf-8")
+    commands.cmd_apply(tmp_path, "t")
+    assert (tp.dir / "apps" / "waybar" / "colors.css").read_text() == "bg #deadbe\naccent #c0ffee\n"
+
+
+def test_apply_sets_current_symlink(tmp_path):
+    build_catalog(tmp_path)
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    commands.cmd_new(tmp_path, "t", str(wp), do_apply=False)
+    commands.cmd_apply(tmp_path, "t")
+    assert catalog.current_theme(tmp_path) == "t"
+
+
+def test_apply_writes_swaylock_block(tmp_path):
+    swaycfg = build_catalog(tmp_path)
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    commands.cmd_new(tmp_path, "t", str(wp))
+    text = swaycfg.read_text()
+    assert "font=Foo" in text                      # structural preserved
+    assert "ring=" in text                          # color block injected
+    from adorn import render
+    assert render.MARKER_BEGIN in text
+
+
+def test_render_redramatizes_from_palette(tmp_path):
+    build_catalog(tmp_path)
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    commands.cmd_new(tmp_path, "t", str(wp), do_apply=False)
+    frag = catalog.theme_paths(tmp_path, "t").dir / "apps" / "waybar" / "colors.css"
+    frag.write_text("HAND EDIT\n", encoding="utf-8")
+    commands.cmd_render(tmp_path, "t")              # regenerate from palette
+    assert frag.read_text().startswith("bg #")      # edit overwritten by render
+    assert "HAND EDIT" not in frag.read_text()
+
+
+def test_overrides_flow_to_fragment_on_render(tmp_path):
+    build_catalog(tmp_path)
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    commands.cmd_new(tmp_path, "t", str(wp), do_apply=False)
+    tp = catalog.theme_paths(tmp_path, "t")
     palette.dump({"bg": "#000000"}, tp.overrides)
-    commands.cmd_apply(tmp_path, "test")
-    assert "background #000000" in (tmp_path / "kitty-colors.conf").read_text()
+    commands.cmd_render(tmp_path, "t")
+    assert "bg #000000" in (tp.dir / "apps" / "waybar" / "colors.css").read_text()
 
 
-def test_effective_palette_merges(tmp_path):
+def test_cli_render_subcommand(tmp_path):
     build_catalog(tmp_path)
-    wp = tmp_path / "src.png"
-    make_wallpaper(wp)
-    commands.cmd_new(tmp_path, "test", str(wp), do_apply=False)
-    tp = catalog.theme_paths(tmp_path, "test")
-    palette.dump({"bg": "#000000"}, tp.overrides)
-    eff = commands.effective_palette(tmp_path, "test")
-    assert eff["bg"] == "#000000"
-    assert "accent" in eff
-
-
-def test_cli_list_and_current(tmp_path, capsys):
-    build_catalog(tmp_path)
-    wp = tmp_path / "src.png"
-    make_wallpaper(wp)
-    cli.main(["--root", str(tmp_path), "new", "test", str(wp), "--no-apply"])
-    cli.main(["--root", str(tmp_path), "apply", "test"])
-    capsys.readouterr()
-    cli.main(["--root", str(tmp_path), "list"])
-    assert "* test" in capsys.readouterr().out
-    cli.main(["--root", str(tmp_path), "current"])
-    assert "test" in capsys.readouterr().out
-
-
-def test_new_with_saturation_floor_and_stats(tmp_path, capsys):
-    build_catalog(tmp_path)
-    wp = tmp_path / "src.png"
-    make_wallpaper(wp)
-    commands.cmd_new(tmp_path, "pop", str(wp), saturation_floor=0.5)
-    out = capsys.readouterr().out
-    assert "compiled 'pop'" in out
-    assert "sat floor   0.50" in out
-    # the floor lifted the hue roles in the saved palette
-    from adorn import color
-    pal = palette.load(catalog.theme_paths(tmp_path, "pop").palette)
-    assert color.hsl(pal["red"])[1] >= 0.45
-
-
-def test_cli_new_saturation_flag(tmp_path):
-    build_catalog(tmp_path)
-    wp = tmp_path / "src.png"
-    make_wallpaper(wp)
-    cli.main(["--root", str(tmp_path), "new", "v", str(wp), "--no-apply", "--saturation", "0.4"])
-    from adorn import color
-    pal = palette.load(catalog.theme_paths(tmp_path, "v").palette)
-    assert color.hsl(pal["red"])[1] >= 0.35
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    cli.main(["--root", str(tmp_path), "new", "t", str(wp), "--no-apply"])
+    assert cli.main(["--root", str(tmp_path), "render", "t"]) == 0

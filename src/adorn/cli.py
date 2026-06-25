@@ -33,6 +33,8 @@ def main(argv=None) -> int:
     p_recompile.add_argument("name")
     p_recompile.add_argument("--saturation", type=float, default=None,
                              help="hue saturation floor 0..1")
+    p_render = sub.add_parser("render", help="re-derive apps/ fragments from palette+overrides")
+    p_render.add_argument("name")
     p_preview = sub.add_parser("preview", help="print a theme's palette as swatches")
     p_preview.add_argument("name")
     sub.add_parser("init", help="scaffold a starter ~/.config/adorn config")
@@ -50,6 +52,8 @@ def main(argv=None) -> int:
         elif args.command == "new":
             commands.cmd_new(root, args.name, args.wallpaper,
                              do_apply=not args.no_apply, saturation_floor=args.saturation)
+        elif args.command == "render":
+            commands.cmd_render(root, args.name)
         elif args.command == "recompile":
             commands.cmd_recompile(root, args.name, saturation_floor=args.saturation)
         elif args.command == "preview":

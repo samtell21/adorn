@@ -23,9 +23,6 @@ class Manifest:
     themes_dir: Path
     extract_command: str
     wallpaper_command: str | None
-    mood: dict
-    ramp: dict | None
-    hues: dict
     targets: tuple[Target, ...]
 
 
@@ -61,8 +58,5 @@ def load(path) -> Manifest:
         themes_dir=root / "themes",
         extract_command=data.get("extract", {}).get("command", DEFAULT_EXTRACT),
         wallpaper_command=data.get("wallpaper", {}).get("command"),
-        mood=data.get("mood", {}),
-        ramp=data.get("ramp"),
-        hues=data.get("hues", {}),
         targets=tuple(targets),
     )

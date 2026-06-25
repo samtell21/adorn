@@ -36,8 +36,6 @@ def test_load_parses_targets_and_sections(tmp_path):
     assert m.root == tmp_path
     assert m.schemes_dir == tmp_path / "schemes"
     assert m.themes_dir == tmp_path / "themes"
-    assert m.ramp == {"name": "grad", "length": 7, "hues": [300, 215, 175, 120, 40]}
-    assert m.mood["bg_lightness"] == 0.07
     assert len(m.targets) == 1
     t = m.targets[0]
     assert t.name == "kitty"

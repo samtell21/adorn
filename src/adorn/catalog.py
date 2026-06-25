@@ -1,5 +1,6 @@
 """Theme catalog: theme directories and the `current` symlink."""
 import os
+import tomllib
 from collections import namedtuple
 from pathlib import Path
 
@@ -53,3 +54,10 @@ def new_theme_dir(root, name) -> Path:
     d = themes_dir(root) / name
     d.mkdir(parents=True, exist_ok=False)
     return d
+
+
+def theme_scheme(theme_paths) -> str:
+    meta = theme_paths.meta
+    if meta.exists():
+        return tomllib.loads(meta.read_text(encoding="utf-8")).get("scheme", "default")
+    return "default"

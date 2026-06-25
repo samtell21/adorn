@@ -3,7 +3,6 @@
 import re
 import shutil
 import subprocess
-import tomllib
 from pathlib import Path
 
 from . import catalog
@@ -36,16 +35,9 @@ def cmd_current(root) -> None:
     print(catalog.current_theme(root) or "(none)")
 
 
-def theme_scheme(theme_paths) -> str:
-    meta = theme_paths.meta
-    if meta.exists():
-        return tomllib.loads(meta.read_text(encoding="utf-8")).get("scheme", "default")
-    return "default"
-
-
 def render_theme(root, name, manifest) -> None:
     tp = catalog.theme_paths(root, name)
-    scheme_dir = manifest.schemes_dir / theme_scheme(tp)
+    scheme_dir = manifest.schemes_dir / catalog.theme_scheme(tp)
     context = dict(effective_palette(root, name))
     context["wallpaper"] = str(tp.wallpaper)
     render_mod.materialize(manifest, context, tp.dir / "apps", scheme_dir)

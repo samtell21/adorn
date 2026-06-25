@@ -6,8 +6,11 @@ from adorn import catalog, cli, commands, palette
 def setup_theme(tmp_path):
     (tmp_path / "schemes" / "default").mkdir(parents=True)
     (tmp_path / "schemes" / "default" / "w.tmpl").write_text("bg {{ bg }}\n")
+    (tmp_path / "schemes" / "default" / "scheme.toml").write_text(
+        '[mood]\nbg_lightness=0.07\n[ramp]\nname="grad"\nlength=7\nhues=[300,215,175,120,40]\n',
+        encoding="utf-8",
+    )
     (tmp_path / "adorn.toml").write_text(
-        '[mood]\nbg_lightness=0.07\n[ramp]\nname="grad"\nlength=7\nhues=[300,215,175,120,40]\n'
         '[[target]]\nname="waybar"\ntemplate="w.tmpl"\nfragment="colors.css"\n'
     )
     wp = tmp_path / "src.png"

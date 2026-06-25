@@ -5,7 +5,9 @@ wallpaper's "mood" (average saturation). `accent` is the most-saturated raw
 color (the wallpaper's signature). `bg` is pinned near-black, tinted by the
 dominant hue.
 """
+import tomllib
 from dataclasses import dataclass
+from pathlib import Path
 
 from . import catalog, color
 from . import extract as extract_mod
@@ -40,14 +42,24 @@ def mood_saturation(raw: list[str]) -> float:
     return sum(sats) / len(sats) if sats else 0.0
 
 
-def build_palette(raw: list[str], manifest, *, saturation_floor=None) -> dict:
+def load_scheme_config(scheme_dir) -> dict:
+    p = Path(scheme_dir) / "scheme.toml"
+    if p.exists():
+        return tomllib.loads(p.read_text(encoding="utf-8"))
+    return {}
+
+
+def build_palette(raw: list[str], scheme_config: dict, *, saturation_floor=None) -> dict:
     if not raw:
         raise ValueError("build_palette requires at least one raw color")
-    hues = {**DEFAULT_HUES, **manifest.hues}
-    strength = manifest.mood.get("saturation_strength", 1.0)
-    bg_l = manifest.mood.get("bg_lightness", 0.07)
+    mood = scheme_config.get("mood", {})
+    hues = {**DEFAULT_HUES, **scheme_config.get("hues", {})}
+    ramp = scheme_config.get("ramp")
+    fixed = scheme_config.get("fixed", {})
+    strength = mood.get("saturation_strength", 1.0)
+    bg_l = mood.get("bg_lightness", 0.07)
     if saturation_floor is None:
-        saturation_floor = manifest.mood.get("hue_saturation_floor", 0.0)
+        saturation_floor = mood.get("hue_saturation_floor", 0.0)
     if not 0.0 <= saturation_floor <= 1.0:
         raise ValueError(f"saturation floor must be in [0.0, 1.0], got {saturation_floor}")
 
@@ -81,27 +93,28 @@ def build_palette(raw: list[str], manifest, *, saturation_floor=None) -> dict:
     pal["success"] = pal["green"]
     pal["warning"] = pal["yellow"]
 
-    ramp = manifest.ramp
     if ramp:
         stops = [color.make_hsl(h, sat, HUE_LIGHTNESS) for h in ramp["hues"]]
         pal[ramp["name"]] = color.gradient(stops, ramp["length"])
 
+    pal.update(fixed)   # scheme's fixed roles win over derivation
     return pal
 
 
 def compile_theme(root, name, manifest, *, saturation_floor=None) -> CompileResult:
     tp = catalog.theme_paths(root, name)
+    scheme_cfg = load_scheme_config(manifest.schemes_dir / catalog.theme_scheme(tp))
     raw = extract_mod.extract(manifest.extract_command, tp.wallpaper)
-    strength = manifest.mood.get("saturation_strength", 1.0)
-    if saturation_floor is None:
-        saturation_floor = manifest.mood.get("hue_saturation_floor", 0.0)
+    mood = scheme_cfg.get("mood", {})
+    strength = mood.get("saturation_strength", 1.0)
+    floor = saturation_floor if saturation_floor is not None else mood.get("hue_saturation_floor", 0.0)
     mood_sat = mood_saturation(raw)
-    effective = max(saturation_floor, min(1.0, mood_sat * strength))
-    pal = build_palette(raw, manifest, saturation_floor=saturation_floor)
+    effective = max(floor, min(1.0, mood_sat * strength))
+    pal = build_palette(raw, scheme_cfg, saturation_floor=saturation_floor)
     palette_mod.dump(pal, tp.palette)
     return CompileResult(
         palette=pal, raw=raw, mood_saturation=mood_sat,
-        saturation_floor=saturation_floor, strength=strength,
+        saturation_floor=floor, strength=strength,
         effective_saturation=effective, wallpaper=str(tp.wallpaper),
     )
 

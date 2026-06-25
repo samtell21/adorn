@@ -8,14 +8,12 @@ def build_catalog(root):
     (root / "schemes" / "default").mkdir(parents=True)
     (root / "schemes" / "default" / "waybar.tmpl").write_text("bg {{ bg }}\naccent {{ accent }}\n")
     (root / "schemes" / "default" / "sway.tmpl").write_text("output * bg {{ wallpaper }} fill\n")
+    (root / "schemes" / "default" / "scheme.toml").write_text(
+        '[mood]\nbg_lightness=0.07\n[ramp]\nname="grad"\nlength=7\nhues=[300,215,175,120,40]\n',
+        encoding="utf-8",
+    )
     (root / "adorn.toml").write_text(
         """
-[mood]
-bg_lightness = 0.07
-[ramp]
-name = "grad"
-length = 7
-hues = [300, 215, 175, 120, 40]
 [[target]]
 name = "waybar"
 template = "waybar.tmpl"
@@ -184,3 +182,16 @@ def test_preview_renders_ansi_swatches(tmp_path, capsys):
     assert "bg" in out               # role label present
     assert "#" in out                # hex shown
     assert "grad0" in out            # ramp expanded with indices
+
+
+def test_scheme_changes_color_derivation(tmp_path):
+    build_catalog(tmp_path)
+    alt = tmp_path / "schemes" / "alt"; alt.mkdir(parents=True)
+    (alt / "waybar.tmpl").write_text("bg {{ bg }}\naccent {{ accent }}\n")
+    (alt / "sway.tmpl").write_text("output * bg {{ wallpaper }} fill\n")
+    (alt / "scheme.toml").write_text('[fixed]\naccent="#abcdef"\n', encoding="utf-8")
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    commands.cmd_new(tmp_path, "t", str(wp), do_apply=False, scheme="alt")
+    from adorn import palette
+    pal = palette.load(catalog.theme_paths(tmp_path, "t").palette)
+    assert pal["accent"] == "#abcdef"   # scheme's fixed role won

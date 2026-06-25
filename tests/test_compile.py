@@ -1,6 +1,8 @@
 import subprocess
 import types
 
+import pytest
+
 from adorn import catalog, color, compile as compile_mod
 from adorn.manifest import DEFAULT_EXTRACT
 
@@ -64,3 +66,23 @@ def test_compile_theme_writes_palette(tmp_path):
     p = compile_mod.compile_theme(tmp_path, "t", m)
     assert (d / "palette.toml").exists()
     assert "accent" in p and "bg" in p and "grad" in p
+
+
+def test_mood_saturation_empty_returns_zero():
+    assert compile_mod.mood_saturation([]) == 0.0
+
+
+def test_build_palette_empty_raises():
+    with pytest.raises(ValueError, match="at least one raw color"):
+        compile_mod.build_palette([], fake_manifest())
+
+
+def test_all_six_hue_roles_anchored():
+    p = compile_mod.build_palette(RAW, fake_manifest())
+    for role, expected_h in compile_mod.DEFAULT_HUES.items():
+        h = color.hsl(p[role])[0]
+        # red sits near 0/360; allow wrap-around
+        if expected_h == 0:
+            assert h < 10 or h > 350, f"{role} hue {h} not near 0/360"
+        else:
+            assert approx(h, expected_h, 8), f"{role} hue {h} not near {expected_h}"

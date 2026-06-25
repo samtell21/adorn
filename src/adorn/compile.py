@@ -22,10 +22,12 @@ HUE_LIGHTNESS = 0.62  # legibility target for the 6 hue roles on a dark bg
 
 def mood_saturation(raw: list[str]) -> float:
     sats = [color.hsl(c)[1] for c in raw]
-    return sum(sats) / len(sats)
+    return sum(sats) / len(sats) if sats else 0.0
 
 
 def build_palette(raw: list[str], manifest) -> dict:
+    if not raw:
+        raise ValueError("build_palette requires at least one raw color")
     hues = {**DEFAULT_HUES, **manifest.hues}
     strength = manifest.mood.get("saturation_strength", 1.0)
     bg_l = manifest.mood.get("bg_lightness", 0.07)

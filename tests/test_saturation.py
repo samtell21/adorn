@@ -100,3 +100,17 @@ def test_build_palette_rejects_floor_above_one():
 def test_build_palette_rejects_negative_floor():
     with pytest.raises(ValueError, match=r"\[0.0, 1.0\]"):
         compile_mod.build_palette(RAW, fake_manifest(), saturation_floor=-0.1)
+
+
+def test_accent_too_dark_is_lifted_into_visible_band():
+    raw = ["#0a2a1a", "#202020", "#181818"]  # most-saturated is the dark green-teal
+    p = compile_mod.build_palette(raw, fake_manifest())
+    h, s, l = color.hsl(p["accent"])
+    assert l >= 0.40, f"accent lightness {l} not lifted"
+    assert 120 <= h <= 175, f"accent hue {h} not preserved (~green-teal)"
+
+
+def test_accent_in_band_is_unchanged():
+    # RAW's most-saturated (#9b9e61) has L~0.50, already in band -> untouched
+    p = compile_mod.build_palette(RAW, fake_manifest())
+    assert p["accent"] == "#9b9e61"

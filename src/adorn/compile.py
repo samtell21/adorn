@@ -20,6 +20,8 @@ DEFAULT_HUES = {
     "magenta": 300,
 }
 HUE_LIGHTNESS = 0.62  # legibility target for the 6 hue roles on a dark bg
+ACCENT_MIN_LIGHTNESS = 0.40
+ACCENT_MAX_LIGHTNESS = 0.70
 
 
 @dataclass
@@ -53,6 +55,13 @@ def build_palette(raw: list[str], manifest, *, saturation_floor=None) -> dict:
     # most-saturated raw color is the wallpaper's signature; max() picks the
     # first on ties (rare, any winner is acceptable)
     accent = max(raw, key=lambda c: color.hsl(c)[1])
+    # keep the accent's hue+saturation but pull a too-dark/too-light pick into a
+    # visible lightness band, so the signature color is always usable
+    ah, asat, al = color.hsl(accent)
+    if al < ACCENT_MIN_LIGHTNESS:
+        accent = color.make_hsl(ah, asat, ACCENT_MIN_LIGHTNESS)
+    elif al > ACCENT_MAX_LIGHTNESS:
+        accent = color.make_hsl(ah, asat, ACCENT_MAX_LIGHTNESS)
     dom_h = color.hsl(accent)[0]
 
     pal: dict = {}

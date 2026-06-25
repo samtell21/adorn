@@ -163,5 +163,151 @@ git commit -m "refactor: {{wallpaper}} render var; drop via/output/write_block (
 
 ---
 
-### Task 18: Named schemes (deferred — write just-in-time after Task 17)
-### Task 19: `adorn alter` (deferred — write just-in-time after Task 18)
+### Task 18: Named schemes
+
+**Files:**
+- Modify: `src/adorn/manifest.py` (`Manifest.templates_dir` → `schemes_dir`)
+- Modify: `src/adorn/render.py` (`materialize` takes an explicit `templates_dir`)
+- Modify: `src/adorn/catalog.py` (`ThemePaths` gains `meta` = `theme.toml`)
+- Modify: `src/adorn/commands.py` (`theme_scheme` helper; `render_theme` resolves the scheme dir; `cmd_new` writes `theme.toml`)
+- Modify: `src/adorn/cli.py` (`new --scheme`)
+- Modify tests accordingly.
+
+**Interfaces:**
+- `manifest.Manifest(... schemes_dir ...)` (replaces `templates_dir`; `schemes_dir = root/"schemes"`)
+- `render.materialize(manifest, context, apps_dir, templates_dir) -> dict`
+- `catalog.ThemePaths(dir, wallpaper, palette, overrides, files, meta)`
+- `commands.theme_scheme(theme_paths) -> str` (reads `theme.toml` `scheme`, default `"default"`)
+- `commands.cmd_new(root, name, wallpaper, do_apply=True, saturation_floor=None, scheme="default")`
+- `cli`: `new --scheme S`
+
+- [ ] **Step 1: Tests first (RED)** — add to `tests/test_render.py`:
+```python
+def test_materialize_uses_given_templates_dir(tmp_path):
+    sdir = tmp_path / "schemes" / "alt"; sdir.mkdir(parents=True)
+    (sdir / "k.tmpl").write_text("c1 {{ red }}")
+    m = manifest_with(tmp_path, [Target("kitty", template="k.tmpl", fragment="colors.conf")])
+    render.materialize(m, {"red": "#ff0000"}, tmp_path / "apps", sdir)
+    assert (tmp_path / "apps" / "kitty" / "colors.conf").read_text() == "c1 #ff0000"
+```
+Update the OTHER `materialize(...)` calls in test_render.py to pass a 4th arg `tmp_path / "templates"` (the existing fixture dir). Update `manifest_with` to also expose `schemes_dir = tmp_path / "schemes"` (harmless extra attr).
+
+Add to `tests/test_commands.py`:
+```python
+def test_new_records_scheme_and_uses_it(tmp_path):
+    build_catalog(tmp_path)
+    # add an alternate scheme that maps waybar bg to {{ accent }} instead of {{ bg }}
+    alt = tmp_path / "schemes" / "alt"; alt.mkdir(parents=True)
+    (alt / "waybar.tmpl").write_text("bg {{ accent }}\n")
+    (alt / "sway.tmpl").write_text("output * bg {{ wallpaper }} fill\n")
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    commands.cmd_new(tmp_path, "t", str(wp), do_apply=False, scheme="alt")
+    import tomllib
+    meta = tomllib.loads((catalog.theme_paths(tmp_path, "t").dir / "theme.toml").read_text())
+    assert meta["scheme"] == "alt"
+    frag = (catalog.theme_paths(tmp_path, "t").dir / "apps" / "waybar" / "colors.css").read_text()
+    pal = palette.load(catalog.theme_paths(tmp_path, "t").palette)
+    assert pal["accent"] in frag        # used the alt scheme's template
+
+
+def test_default_scheme_when_unspecified(tmp_path):
+    from adorn import commands as C
+    build_catalog(tmp_path)
+    # build_catalog's templates live in tmp_path/"templates"; move them to schemes/default
+    import shutil
+    (tmp_path / "schemes").mkdir(exist_ok=True)
+    shutil.move(str(tmp_path / "templates"), str(tmp_path / "schemes" / "default"))
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    C.cmd_new(tmp_path, "t", str(wp), do_apply=False)   # no scheme -> default
+    assert (catalog.theme_paths(tmp_path, "t").dir / "apps" / "waybar" / "colors.css").exists()
+```
+NOTE: `build_catalog` currently writes templates to `tmp_path/"templates"`. Update `build_catalog` to write them to `tmp_path/"schemes"/"default"` instead (since schemes replace templates). Adjust the two new tests accordingly (the `shutil.move` in the second becomes unnecessary — remove it once build_catalog writes to schemes/default).
+
+- [ ] **Step 2: Run (RED).** `.venv/bin/pytest tests/test_render.py tests/test_commands.py -v`.
+
+- [ ] **Step 3: `manifest.py`** — rename `templates_dir` to `schemes_dir`:
+```python
+        templates_dir=root / "templates",   # DELETE this line
+```
+becomes (in the Manifest(...) construction):
+```python
+        schemes_dir=root / "schemes",
+```
+and in the dataclass replace `templates_dir: Path` with `schemes_dir: Path`.
+
+- [ ] **Step 4: `render.py`** — `materialize` takes `templates_dir`:
+```python
+def materialize(manifest, context: dict, apps_dir, templates_dir) -> dict:
+    env = make_env(templates_dir)
+    rendered = {}
+    for target in manifest.targets:
+        if not target.template:
+            continue
+        content = env.get_template(target.template).render(**context)
+        rendered[target.name] = (Path(apps_dir) / target.name / target.fragment, content)
+    written = {}
+    for name, (dest, content) in rendered.items():
+        _atomic_write(dest, content)
+        written[name] = dest
+    return written
+```
+
+- [ ] **Step 5: `catalog.py`** — add `meta` to ThemePaths:
+```python
+ThemePaths = namedtuple("ThemePaths", "dir wallpaper palette overrides files meta")
+```
+and in `theme_paths(...)` add `meta=d / "theme.toml"` to the returned tuple.
+
+- [ ] **Step 6: `commands.py`** — scheme helper + wire it:
+```python
+import tomllib  # add near the top imports
+
+
+def theme_scheme(theme_paths) -> str:
+    meta = theme_paths.meta
+    if meta.exists():
+        return tomllib.loads(meta.read_text(encoding="utf-8")).get("scheme", "default")
+    return "default"
+
+
+def render_theme(root, name, manifest) -> None:
+    tp = catalog.theme_paths(root, name)
+    scheme_dir = manifest.schemes_dir / theme_scheme(tp)
+    context = dict(effective_palette(root, name))
+    context["wallpaper"] = str(tp.wallpaper)
+    render_mod.materialize(manifest, context, tp.dir / "apps", scheme_dir)
+```
+`cmd_new` writes `theme.toml` (add `scheme` param, write meta before render):
+```python
+def cmd_new(root, name, wallpaper, do_apply=True, saturation_floor=None, scheme="default") -> None:
+    manifest = load_manifest(root)
+    theme_dir = catalog.new_theme_dir(root, name)
+    dest = theme_dir / ("wallpaper" + Path(wallpaper).suffix)
+    shutil.copy(wallpaper, dest)
+    (theme_dir / "overrides.toml").write_text("# per-theme color/role overrides\n", encoding="utf-8")
+    (theme_dir / "theme.toml").write_text(f'scheme = "{scheme}"\n', encoding="utf-8")
+    result = compile_mod.compile_theme(root, name, manifest, saturation_floor=saturation_floor)
+    render_theme(root, name, manifest)
+    print(compile_mod.format_stats(name, result))
+    if do_apply:
+        cmd_apply(root, name)
+```
+
+- [ ] **Step 7: `cli.py`** — `new --scheme`:
+```python
+    p_new.add_argument("--scheme", default="default")
+```
+and pass `scheme=args.scheme` in the `cmd_new(...)` dispatch call.
+
+- [ ] **Step 8: Full suite green.** `.venv/bin/pytest -q`.
+
+- [ ] **Step 9: Commit** `git commit -am "feat: named schemes (schemes/<name>/ template sets + per-theme theme.toml)"`
+
+## Self-Review (Task 18)
+- schemes_dir replaces templates_dir; materialize uses explicit dir → tested. ✓
+- theme.toml records scheme; render resolves it; default when absent → tested (alt + default). ✓
+- new --scheme wired → CLI dispatch. ✓
+
+---
+
+### Task 19: `adorn alter` (write just-in-time after Task 18)

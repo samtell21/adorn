@@ -1,4 +1,4 @@
-"""A palette is a flat dict of role -> "#rrggbb", with ramp roles as lists.
+"""A palette is a flat dict of role -> "#rrggbb", with array roles as lists.
 
 Stored as TOML. Reading uses stdlib tomllib; writing uses a tiny serializer
 (values are only strings or lists of strings) to avoid a write-side dependency.

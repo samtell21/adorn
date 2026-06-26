@@ -10,7 +10,7 @@ from adorn.manifest import DEFAULT_EXTRACT
 def fake_scheme(**over):
     cfg = {
         "mood": {"saturation_strength": 1.0, "bg_lightness": 0.07},
-        "ramp": {"name": "grad", "length": 7, "hues": [300, 215, 175, 120, 40]},
+        "list": {"name": "grad", "length": 7, "hues": [300, 215, 175, 120, 40]},
         "hues": {},
     }
     cfg.update(over)
@@ -65,7 +65,7 @@ def test_compile_theme_returns_result_with_stats(tmp_path):
     subprocess.run(f"magick -size 16x16 xc:#9b9e61 {img}", shell=True, check=True)
     (tmp_path / "schemes" / "default").mkdir(parents=True)
     (tmp_path / "schemes" / "default" / "scheme.toml").write_text(
-        '[mood]\nbg_lightness=0.07\n[ramp]\nname="grad"\nlength=7\nhues=[300,215,175,120,40]\n',
+        '[mood]\nbg_lightness=0.07\n[list]\nname="grad"\nlength=7\nhues=[300,215,175,120,40]\n',
         encoding="utf-8",
     )
     (d / "theme.toml").write_text('scheme = "default"\n', encoding="utf-8")

@@ -50,6 +50,20 @@ def test_semantic_aliases_and_ramp():
     assert isinstance(p["grad"], list) and len(p["grad"]) == 7
 
 
+def test_single_ramp_still_works():
+    p = compile_mod.build_palette(RAW, fake_scheme(ramp={"name": "grad", "length": 7, "hues": [300, 120, 40]}))
+    assert isinstance(p["grad"], list) and len(p["grad"]) == 7
+
+
+def test_multiple_ramps():
+    cfg = fake_scheme(ramp=[
+        {"name": "grad", "length": 7, "hues": [300, 120, 40]},
+        {"name": "warm", "length": 3, "hues": [10, 40]},
+    ])
+    p = compile_mod.build_palette(RAW, cfg)
+    assert len(p["grad"]) == 7 and len(p["warm"]) == 3
+
+
 def test_custom_hue_override():
     p = compile_mod.build_palette(RAW, fake_scheme(hues={"red": 10}))
     assert approx(color.hsl(p["red"])[0], 10, 8)

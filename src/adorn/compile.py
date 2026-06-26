@@ -54,7 +54,6 @@ def build_palette(raw: list[str], scheme_config: dict, *, saturation_floor=None)
         raise ValueError("build_palette requires at least one raw color")
     mood = scheme_config.get("mood", {})
     hues = {**DEFAULT_HUES, **scheme_config.get("hues", {})}
-    ramp = scheme_config.get("ramp")
     fixed = scheme_config.get("fixed", {})
     strength = mood.get("saturation_strength", 1.0)
     bg_l = mood.get("bg_lightness", 0.07)
@@ -93,7 +92,10 @@ def build_palette(raw: list[str], scheme_config: dict, *, saturation_floor=None)
     pal["success"] = pal["green"]
     pal["warning"] = pal["yellow"]
 
-    if ramp:
+    ramps = scheme_config.get("ramp", [])
+    if isinstance(ramps, dict):      # backward-compat: a single [ramp] table
+        ramps = [ramps]
+    for ramp in ramps:
         stops = [color.make_hsl(h, sat, HUE_LIGHTNESS) for h in ramp["hues"]]
         pal[ramp["name"]] = color.gradient(stops, ramp["length"])
 

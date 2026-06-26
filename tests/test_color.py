@@ -59,3 +59,9 @@ def test_no_shell_injection_via_color_value(tmp_path):
     with pytest.raises(subprocess.CalledProcessError):
         color.hsl(evil)            # pastel rejects the bogus color, no shell runs
     assert not sentinel.exists()
+
+
+def test_rgb_triple():
+    assert color.rgb_triple("#9fb06a") == "159;176;106"
+    assert color.rgb_triple("#000000") == "0;0;0"
+    assert color.rgb_triple("#ffffff") == "255;255;255"

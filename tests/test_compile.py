@@ -10,7 +10,7 @@ from adorn.manifest import DEFAULT_EXTRACT
 def fake_scheme(**over):
     cfg = {
         "mood": {"saturation_strength": 1.0, "bg_lightness": 0.07},
-        "ramp": {"name": "grad", "length": 7, "hues": [300, 215, 175, 120, 40]},
+        "list": {"name": "grad", "length": 7, "hues": [300, 215, 175, 120, 40]},
         "hues": {},
     }
     cfg.update(over)
@@ -50,6 +50,20 @@ def test_semantic_aliases_and_ramp():
     assert isinstance(p["grad"], list) and len(p["grad"]) == 7
 
 
+def test_single_list_still_works():
+    p = compile_mod.build_palette(RAW, fake_scheme(list={"name": "grad", "length": 7, "hues": [300, 120, 40]}))
+    assert isinstance(p["grad"], list) and len(p["grad"]) == 7
+
+
+def test_multiple_lists():
+    cfg = fake_scheme(list=[
+        {"name": "grad", "length": 7, "hues": [300, 120, 40]},
+        {"name": "warm", "length": 3, "hues": [10, 40]},
+    ])
+    p = compile_mod.build_palette(RAW, cfg)
+    assert len(p["grad"]) == 7 and len(p["warm"]) == 3
+
+
 def test_custom_hue_override():
     p = compile_mod.build_palette(RAW, fake_scheme(hues={"red": 10}))
     assert approx(color.hsl(p["red"])[0], 10, 8)
@@ -62,7 +76,7 @@ def test_compile_theme_writes_palette(tmp_path):
     subprocess.run(f"magick -size 16x16 xc:#9b9e61 {img}", shell=True, check=True)
     (tmp_path / "schemes" / "default").mkdir(parents=True)
     (tmp_path / "schemes" / "default" / "scheme.toml").write_text(
-        '[mood]\nbg_lightness=0.07\n[ramp]\nname="grad"\nlength=7\nhues=[300,215,175,120,40]\n',
+        '[mood]\nbg_lightness=0.07\n[list]\nname="grad"\nlength=7\nhues=[300,215,175,120,40]\n',
         encoding="utf-8",
     )
     (d / "theme.toml").write_text('scheme = "default"\n', encoding="utf-8")

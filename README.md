@@ -137,10 +137,15 @@ Every template is rendered with these variables:
 | `accent` | the wallpaper's signature color |
 | `red` `green` `yellow` `blue` `cyan` `magenta` | the six semantic hues |
 | `urgent` `success` `warning` | aliases of `red` / `green` / `yellow` |
-| `grad` | the ramp — a **list**, e.g. `{{ grad[0] }}` … `{{ grad[6] }}` |
+| `grad` | the default color **array** (a list), e.g. `{{ grad[0] }}` … `{{ grad[6] }}` |
 | `wallpaper` | absolute path to the theme's wallpaper |
 
-All values are `#rrggbb`. Derive colors inline with pastel-backed **filters**:
+…plus **any custom roles you define** in the scheme (see below). Single-color
+roles come from `[hues]` (theme-derived) or `[fixed]` (literal); arrays come from
+`[[list]]`. So the role set is open, not fixed.
+
+All values are `#rrggbb` (arrays are lists of them). Derive colors inline with
+pastel-backed **filters**:
 
 ```jinja
 {{ bg | mix(green, 0.2) }}     {# blend bg 20% toward green — e.g. a diff wash #}
@@ -168,7 +173,8 @@ Just `[extract]` and one `[[target]]` per app:
 
 ## Scheme color derivation (`schemes/<name>/scheme.toml`)
 
-Controls how the wallpaper becomes roles:
+Controls how the wallpaper becomes roles. This is also where you **define your
+own roles** — the built-in set is just defaults.
 
 ```toml
 [mood]
@@ -176,20 +182,29 @@ saturation_strength  = 1.0    # how hard hues lean toward the wallpaper's mood
 hue_saturation_floor = 0.0    # raise (e.g. 0.30) so muted wallpapers stay legible
 bg_lightness         = 0.07   # how dark the background is
 
-[ramp]                        # the `grad` rainbow
-name   = "grad"
-length = 7
-hues   = [300, 250, 215, 175, 120, 60, 40]   # waypoints; sweeps at theme S/L
+[hues]                        # single-color roles by hue angle (theme-derived).
+red  = 5                      #   override a built-in...
+teal = 180                    #   ...or define a brand-new role -> {{ teal }}
 
-[hues]                        # optional: override a role's canonical hue angle
-red = 5
+[fixed]                       # single-color roles pinned to a literal hex
+bg    = "#000000"             #   override a built-in...
+brand = "#5b8fb0"             #   ...or define a new one -> {{ brand }}
 
-[fixed]                       # optional: pin a role to a literal hex, ignoring the wallpaper
-bg = "#000000"
+[[list]]                      # a named color ARRAY (multiple [[list]] allowed).
+name   = "grad"               #   role name -> {{ grad[0] }} … {{ grad[6] }}
+length = 7                    #   how many colors
+hues   = [300, 250, 215, 175, 120, 60, 40]   # hue waypoints; sweeps at theme S/L
+
+[[list]]                      # a second array, e.g. just warm tones
+name   = "warm"
+length = 4
+hues   = [10, 30, 50]
 ```
 
-A theme picks its scheme via `adorn new <name> <wallpaper> --scheme <scheme>`
-(recorded in `themes/<name>/theme.toml`; defaults to `default`).
+So roles aren't a fixed set: `[hues]`/`[fixed]` create single-color roles
+(theme-derived or literal), and each `[[list]]` creates an array role. A theme
+picks its scheme via `adorn new <name> <wallpaper> --scheme <scheme>` (recorded
+in `themes/<name>/theme.toml`; defaults to `default`).
 
 ---
 

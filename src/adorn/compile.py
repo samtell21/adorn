@@ -54,7 +54,6 @@ def build_palette(raw: list[str], scheme_config: dict, *, saturation_floor=None)
         raise ValueError("build_palette requires at least one raw color")
     mood = scheme_config.get("mood", {})
     hues = {**DEFAULT_HUES, **scheme_config.get("hues", {})}
-    ramp = scheme_config.get("ramp")
     fixed = scheme_config.get("fixed", {})
     strength = mood.get("saturation_strength", 1.0)
     bg_l = mood.get("bg_lightness", 0.07)
@@ -93,9 +92,12 @@ def build_palette(raw: list[str], scheme_config: dict, *, saturation_floor=None)
     pal["success"] = pal["green"]
     pal["warning"] = pal["yellow"]
 
-    if ramp:
-        stops = [color.make_hsl(h, sat, HUE_LIGHTNESS) for h in ramp["hues"]]
-        pal[ramp["name"]] = color.gradient(stops, ramp["length"])
+    arrays = scheme_config.get("list", [])
+    if isinstance(arrays, dict):      # backward-compat: a single [list] table
+        arrays = [arrays]
+    for arr in arrays:
+        stops = [color.make_hsl(h, sat, HUE_LIGHTNESS) for h in arr["hues"]]
+        pal[arr["name"]] = color.gradient(stops, arr["length"])
 
     pal.update(fixed)   # scheme's fixed roles win over derivation
     return pal

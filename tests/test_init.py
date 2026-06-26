@@ -31,7 +31,7 @@ def test_cli_init_then_configs_valid(tmp_path):
     man = tomllib.loads((tmp_path / "adorn.toml").read_text(encoding="utf-8"))
     assert "extract" in man and "mood" not in man
     sch = tomllib.loads((tmp_path / "schemes" / "default" / "scheme.toml").read_text(encoding="utf-8"))
-    assert "mood" in sch and "ramp" in sch
+    assert "mood" in sch and "list" in sch
 
 
 def test_cli_missing_manifest_is_clean_error(tmp_path, capsys):

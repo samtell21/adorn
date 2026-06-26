@@ -9,7 +9,7 @@ def build_catalog(root):
     (root / "schemes" / "default" / "waybar.tmpl").write_text("bg {{ bg }}\naccent {{ accent }}\n")
     (root / "schemes" / "default" / "sway.tmpl").write_text("output * bg {{ wallpaper }} fill\n")
     (root / "schemes" / "default" / "scheme.toml").write_text(
-        '[mood]\nbg_lightness=0.07\n[ramp]\nname="grad"\nlength=7\nhues=[300,215,175,120,40]\n',
+        '[mood]\nbg_lightness=0.07\n[list]\nname="grad"\nlength=7\nhues=[300,215,175,120,40]\n',
         encoding="utf-8",
     )
     (root / "adorn.toml").write_text(

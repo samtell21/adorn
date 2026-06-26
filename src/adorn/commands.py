@@ -115,7 +115,7 @@ saturation_strength = 1.0
 hue_saturation_floor = 0.0   # raise (e.g. 0.30) for more saturated semantic colors
 bg_lightness = 0.07
 
-[ramp]
+[[list]]
 name = "grad"
 length = 7
 hues = [300, 250, 215, 175, 120, 60, 40]
@@ -145,7 +145,7 @@ def cmd_alter(root, name, colors, write, command) -> None:
         raise ValueError("no pastel command given")
     pal = effective_palette(root, name)
 
-    # flatten palette into selectable colors (ramp -> grad0..gradN-1)
+    # flatten palette into selectable colors (array -> grad0..gradN-1)
     selectable = {}
     for k, v in pal.items():
         if isinstance(v, list):
@@ -200,18 +200,18 @@ def cmd_alter(root, name, colors, write, command) -> None:
     if write:
         tp = catalog.theme_paths(root, name)
         overrides = palette_mod.load(tp.overrides)
-        ramp_name, ramp_list = None, None
+        array_name, array_vals = None, None
         for role, newc in zip(selected, results):
             m = re.fullmatch(r"([a-zA-Z_]+)(\d+)", role)
             if m and isinstance(pal.get(m.group(1)), list):
                 base, idx = m.group(1), int(m.group(2))
-                if ramp_list is None:
-                    ramp_name, ramp_list = base, list(pal[base])
-                ramp_list[idx] = newc
+                if array_vals is None:
+                    array_name, array_vals = base, list(pal[base])
+                array_vals[idx] = newc
             else:
                 overrides[role] = newc
-        if ramp_list is not None:
-            overrides[ramp_name] = ramp_list
+        if array_vals is not None:
+            overrides[array_name] = array_vals
         palette_mod.dump(overrides, tp.overrides)
         print(f"wrote {len(selected)} override(s) to {tp.overrides}")
 

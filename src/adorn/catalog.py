@@ -4,7 +4,7 @@ import tomllib
 from collections import namedtuple
 from pathlib import Path
 
-ThemePaths = namedtuple("ThemePaths", "dir wallpaper palette overrides files meta")
+ThemePaths = namedtuple("ThemePaths", "dir wallpaper palette overrides meta")
 
 
 def themes_dir(root) -> Path:
@@ -45,7 +45,6 @@ def theme_paths(root, name) -> ThemePaths:
         wallpaper=wallpaper,
         palette=d / "palette.toml",
         overrides=d / "overrides.toml",
-        files=d / "files",
         meta=d / "theme.toml",
     )
 

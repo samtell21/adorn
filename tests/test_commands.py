@@ -195,3 +195,11 @@ def test_scheme_changes_color_derivation(tmp_path):
     from adorn import palette
     pal = palette.load(catalog.theme_paths(tmp_path, "t").palette)
     assert pal["accent"] == "#abcdef"   # scheme's fixed role won
+
+
+def test_new_unknown_scheme_errors(tmp_path):
+    import pytest
+    build_catalog(tmp_path)
+    wp = tmp_path / "src.png"; make_wallpaper(wp)
+    with pytest.raises(ValueError, match="no such scheme"):
+        commands.cmd_new(tmp_path, "t", str(wp), do_apply=False, scheme="nope")

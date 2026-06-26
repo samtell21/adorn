@@ -62,6 +62,8 @@ def cmd_apply(root, name) -> None:
 
 def cmd_new(root, name, wallpaper, do_apply=True, saturation_floor=None, scheme="default") -> None:
     manifest = load_manifest(root)
+    if not (manifest.schemes_dir / scheme).is_dir():
+        raise ValueError(f"no such scheme: {scheme!r} (looked in {manifest.schemes_dir})")
     theme_dir = catalog.new_theme_dir(root, name)
     dest = theme_dir / ("wallpaper" + Path(wallpaper).suffix)
     shutil.copy(wallpaper, dest)

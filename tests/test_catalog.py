@@ -37,7 +37,6 @@ def test_theme_paths(tmp_path):
     assert tp.wallpaper == d / "wallpaper.jpg"
     assert tp.palette == d / "palette.toml"
     assert tp.overrides == d / "overrides.toml"
-    assert tp.files == d / "files"
 
 
 def test_new_theme_dir_creates_then_conflicts(tmp_path):

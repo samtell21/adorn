@@ -70,35 +70,88 @@ and theme a completely different set of apps.
 
 ### Catalog layout (`~/.config/adorn/`)
 
+adorn's directory holds **only theme/color material**. The user's structural app
+configs stay in `~/.config/<app>/`, each carrying a single `include`/`@import`
+line that points at the active theme via the `current` symlink.
+
 ```
 adorn.toml                      # manifest (targets, knobs, wallpaper hook)
-templates/                      # kitty.conf.tmpl, colors.css.tmpl, palette.lua.tmpl, ...
+templates/                      # waybar-colors.css.tmpl, kitty-colors.tmpl, ...
 themes/
   succulents/
     wallpaper.jpg
-    palette.toml                # generated, committed
-    overrides.toml              # hand-pinned role deltas
-    files/                      # optional verbatim configs (escape hatch)
-      wofi/style.css            #   used as-is, skips that target's template
+    palette.toml                # base palette (extraction) — the starting place
+    overrides.toml              # palette-level role tweaks
+    apps/                       # MATERIALIZED, editable per-app color fragments,
+      waybar/colors.css         #   saved with the theme. Rendered from
+      kitty/colors.conf         #   palette+overrides by `new`/`render`, then
+      mako/colors               #   freely hand-editable. THIS is the per-app
+      wofi/colors.css           #   control layer.
+      zathura/colors
+      sway/colors
+      nvim/palette.lua
 current -> themes/succulents    # symlink marks the active theme
 ```
 
-Generated runtime fragments live under `~/.config/adorn/current/<app>/...`
-(e.g. nvim reads `~/.config/adorn/current/nvim/palette.lua`) so each app gets a
-namespaced subdir and the nvim git repo stays clean.
+The `apps/` fragments are the per-app editable layer the whole system exists to
+provide: adorn gives a base (palette → rendered fragments), and the user tweaks
+the palette, the overrides, AND any individual app fragment — all saved in the
+theme. Each app's real config sources the active theme's fragment through
+`current`, e.g. `~/.config/adorn/current/apps/nvim/palette.lua`.
 
-## Color fragments, not whole-config templating
+## Delivery: source-from-`current`, copy only as a forced fallback
 
-Rather than templatize each full config (fragile), each app `include`s a small
-generated colors fragment; the hand-tuned structural config stays untouched and
-version-controlled:
+Each app's structural config stays in `~/.config/<app>/` and carries ONE line
+that includes the active theme's color fragment via the `current` symlink.
+Switching themes is then just repointing `current` + reloading — adorn never
+rewrites the user's structural config.
 
-- `kitty.conf`  → `include colors.conf`
-- `waybar/style.css` → `@import "colors.css"` (the `@define-color` block moves there)
-- `sway/config` → `include ~/.config/sway/colors`
-- `mako` → `include` (≥1.7) or a full-file template
-- `nvim` → reads `~/.config/adorn/current/nvim/palette.lua` (gitignored path)
-- `zathura`, `swaylock`, `delta` → small generated fragments / templated files
+- `kitty.conf`     → `include ~/.config/adorn/current/apps/kitty/colors.conf`
+- `waybar/style.css` → `@import "…/current/apps/waybar/colors.css"` (define-color block)
+- `sway/config`    → `include ~/.config/adorn/current/apps/sway/colors`
+- `mako/config`    → `include=~/.config/adorn/current/apps/mako/colors`
+- `wofi/style.css` → `@import "…/current/apps/wofi/colors.css"` (define-color block)
+- `zathura/zathurarc` → `include ~/.config/adorn/current/apps/zathura/colors`
+- `nvim`           → `dofile`/`require` of `…/current/apps/nvim/palette.lua`
+
+**App-specific delivery via plugins (forced fallback).** swaylock has no include
+mechanism, so its colors must be written into its config. Rather than special-case
+this in the engine, adorn leans on the `reload` field: a target's `reload` is just
+a shell command run (after `current` is flipped) at apply time. For swaylock the
+`reload` command IS a plugin script — `~/.config/adorn/plugins/swaylock` — that
+reads the active fragment (`current/apps/swaylock/colors`) and rewrites a delimited
+block (`# >>> adorn` / `# <<< adorn`) in `~/.config/swaylock/config`, preserving
+structural settings.
+
+Plugins live in `~/.config/adorn/plugins/` (user-owned, untouched by `pipx`
+upgrades). A plugin defaults its input (`current/apps/<app>/<file>`) and output
+(the app's known config path) and accepts overrides as args. adorn ships
+`swaylock` as the worked example. The engine has **no** plugin/`via`/block code —
+plugins are simply reload commands, so any app needing bespoke write logic is a
+user script referenced from `reload`.
+
+**Wallpaper as a render variable.** Templates receive `{{ wallpaper }}` (the
+active theme's wallpaper absolute path) alongside the palette roles, so the
+wallpaper is managed *in the fragments*: the sway fragment carries
+`output * bg {{ wallpaper }} fill` (surviving `swaymsg reload`) and swaylock
+carries `image={{ wallpaper }}`. No separate wallpaper-setting command needed.
+
+**Named schemes (templates + color system).** `templates/` becomes
+`schemes/<scheme>/`. A scheme owns BOTH the template set AND the color
+definition:
+- template files (`*.tmpl`) — the role→app mapping (kitty `color1` = red in one
+  scheme, yellow in another);
+- `schemes/<scheme>/scheme.toml` — the **color derivation**: `[mood]`
+  (saturation_strength, hue_saturation_floor, bg_lightness), `[ramp]`, `[hues]`
+  (per-role canonical hue overrides), and optional `[fixed]` (roles pinned to a
+  literal hex regardless of wallpaper).
+
+So a scheme is a complete color *system*; a theme instantiates it by running its
+wallpaper through that scheme's derivation. The global `adorn.toml` keeps only
+`[extract]` and the `[[target]]`s (which apps + delivery); the color knobs live
+per-scheme. A theme records its scheme in `themes/<name>/theme.toml`
+(`scheme = "default"`); `new --scheme X` selects it; unspecified → `default`. The
+`default` scheme carries today's values. (Still knobs + fixed roles, not a DSL.)
 
 ## Palette schema (roles)
 
@@ -128,9 +181,26 @@ Derived from what the configs already use (base16-ish + the waybar rainbow):
   with a whisper of theme. Any theme can pin `bg = "#000000"` in `overrides.toml`.
 - **Rainbow `grad0..6`:** a configurable ramp — a hue sweep at the theme's S/L so
   it stays colorful but leans toward the theme.
+- **Saturation floor (legibility/distinguishability knob):** the hue-role
+  saturation is `clamp(mood_sat × saturation_strength, hue_saturation_floor,
+  1.0)`. Default floor is `0.0` (pure mood — the preferred muted look on muted
+  wallpapers). Raising it (e.g. `0.30`) lifts the 6 hue roles + ramp to a minimum
+  saturation so semantic/ANSI colors stay tellable apart on a muted wallpaper,
+  *without* touching `accent`/`bg`/`fg`. Discovered via real-wallpaper testing:
+  at floor 0 a muted wallpaper makes red≈yellow≈muted (fine as UI, blurry for a
+  terminal). The floor is settable per generation (see commands) so one image can
+  yield several saved variants at different saturations.
 
-v1 exposes tunable knobs (canonical hues, mood strength, bg lightness, ramp
-endpoints/length) in the manifest — not an expression DSL.
+v1 exposes tunable knobs (canonical hues, mood strength + saturation floor, bg
+lightness, ramp endpoints/length) in the manifest — not an expression DSL.
+
+## Compile stats
+
+`adorn new` and `adorn recompile` print a stats block to stdout after compiling:
+theme name, wallpaper, raw-color count, mood saturation, the saturation floor
+used, the effective hue saturation, and the key role swatches with their H/S/L —
+so the chosen saturation is visible without re-deriving it via `pastel`. Pipe to
+a file to keep a record.
 
 ## Manifest (`adorn.toml`) sketch
 
@@ -144,7 +214,8 @@ command = "magick {path} -resize 10% -colors 16 -depth 8 -format %c histogram:in
 command = "swaymsg output '*' bg {path} fill"   # {path} substituted
 
 [mood]
-saturation_strength = 1.0     # how hard derived roles lean toward wallpaper mood
+saturation_strength = 1.0      # how hard derived roles lean toward wallpaper mood
+hue_saturation_floor = 0.0     # min saturation for the 6 hue roles + ramp (0 = pure mood)
 bg_lightness = 0.07
 
 [ramp]                         # the waybar rainbow
@@ -152,23 +223,33 @@ name = "grad"
 length = 7
 hues = [300, 250, 170, 120, 40]   # sweep waypoints; S/L from mood
 
+# A target renders a fragment into themes/<name>/apps/<name>/<fragment>.
+# Apps source it via current/; apply just flips the symlink + reloads.
 [[target]]
 name   = "waybar"
-template = "colors.css.tmpl"
-output   = "~/.config/waybar/colors.css"
+template = "waybar-colors.css.tmpl"
+fragment = "colors.css"                  # → apps/waybar/colors.css
 reload   = "pkill -SIGUSR2 waybar"
 
 [[target]]
 name   = "kitty"
-template = "kitty.conf.tmpl"
-output   = "~/.config/kitty/colors.conf"
-reload   = "kitty @ set-colors --all ~/.config/kitty/colors.conf"
+template = "kitty-colors.tmpl"
+fragment = "colors.conf"
+reload   = "kitty @ set-colors --all ~/.config/adorn/current/apps/kitty/colors.conf"
 
 [[target]]
 name   = "nvim"
-template = "palette.lua.tmpl"
-output   = "~/.config/adorn/current/nvim/palette.lua"
+template = "nvim-palette.lua.tmpl"
+fragment = "palette.lua"
 # no reload — picked up on next launch
+
+# Forced fallback: swaylock can't include, so apply rewrites a marked block.
+[[target]]
+name   = "swaylock"
+template = "swaylock-colors.tmpl"
+fragment = "colors"
+via      = "block"                       # managed-block injection
+output   = "~/.config/swaylock/config"   # the file whose marked block is rewritten
 ```
 
 ## Mechanics
@@ -180,26 +261,61 @@ output   = "~/.config/adorn/current/nvim/palette.lua"
 - **Merge:** effective palette = `palette.toml` + `overrides.toml` layered on top.
   Generated and hand-tuned stay separate, so the generated half can be recompiled
   without losing tweaks.
-- **Render:** Jinja2-render each target's template with the effective palette →
-  output. Placeholders: `{{ bg }}`, `{{ accent }}`, `{{ grad[0] }}`, etc.
-  If `themes/<name>/files/<target>/` exists, its file is copied verbatim to that
-  target's `output` instead of rendering the template (keyed by target name; the
-  file inside keeps the output's basename, e.g. `files/wofi/style.css`).
-- **Apply (atomic):** render everything to a temp dir → atomically move into place
-  → run each reload hook → set wallpaper → update the `current` symlink. A failed
-  render can't half-apply; re-applying is idempotent.
+- **Render (materialize):** Jinja2-render each target's template with the
+  effective palette → write to `themes/<name>/apps/<target>/<fragment>`.
+  Placeholders: `{{ bg }}`, `{{ accent }}`, `{{ grad[0] }}`, etc. This is the
+  *only* step that writes the `apps/` fragments, so hand-edits to them persist
+  until the user explicitly re-renders. `new` runs render once; `render <name>`
+  re-derives them from the (possibly edited) palette+overrides.
+- **Apply:** point `current` → `themes/<name>`; for `via="block"` targets
+  (swaylock), rewrite the marked color block in the target's real config from the
+  theme's fragment; run reload hooks; set wallpaper. Apply does **not** re-render
+  — it deploys the already-materialized `apps/` fragments, so apply never clobbers
+  hand-edits. Source-from-`current` targets need no copy (their app config already
+  includes `current/apps/<target>/<fragment>`). Re-applying is idempotent.
 
 ## Command interface
 
 ```
-adorn list                    # catalog, * marks current
-adorn new <name> <wallpaper>  # compile from image → theme dir, then apply (--no-apply to skip)
-adorn apply <name>            # merge → render → atomic write → reload → set wallpaper → update current
-adorn current                 # show active theme
-adorn preview <name>          # print palette as pastel swatches WITHOUT applying
-adorn recompile <name>        # re-run extract+pastel from the wallpaper (keeps overrides)
-adorn edit <name>             # open overrides.toml in $EDITOR (optional convenience)
+adorn list                                # catalog, * marks current
+adorn new <name> <wallpaper> [--scheme S] [--saturation F]  # extract palette + render apps/, stats, then apply (--no-apply)
+adorn apply <name>                        # current → theme; reload (incl. plugin reloads); deploys apps/ as-is
+adorn render <name>                       # re-derive apps/ fragments from palette+overrides (overwrites apps/)
+adorn alter <name> [-c roles] [-w] <pastel-cmd…>  # run a pastel pipeline over theme colors (see below)
+adorn current                             # show active theme
+adorn preview <name>                      # print palette as ANSI truecolor swatches WITHOUT applying
+adorn recompile <name> [--saturation F]   # re-run extraction → palette.toml only (keeps overrides; then `render`)
+adorn edit <name>                         # open overrides.toml in $EDITOR (optional convenience)
 ```
+
+### `adorn alter` — pastel pipelines over theme colors
+
+`adorn alter <theme> [-c role[,role…]] [-w] <pastel command…>` runs a `pastel`
+pipeline against a theme's effective colors.
+
+- **Selection:** `-c/--color role,role` picks colors; absent ⇒ all palette colors
+  (ramp entries as `grad0…gradN`).
+- **`+role` sigil:** any `+role` token in the command is replaced with that role's
+  hex (so a color can be both piped in *and* referenced as an argument).
+- **Execution:** the N selected colors are fed (one hex per line) into the pastel
+  command; pastel emits M colors. **Require M == N**, mapping 1:1 back to the
+  selected colors. M≠N (e.g. `color #111` yields 1 for N>1) is an error — set
+  multiple colors to one value with explicit separate calls.
+- **`-w/--write`:** write the N results to the selected roles in
+  `themes/<theme>/overrides.toml` (then `render` to push into `apps/`).
+
+Examples: `alter volc -c red saturate .5`; `alter volc -c accent -w mix +magenta`;
+`alter volc -w saturate .3` (lift every color).
+
+The key separation: **`render` writes the `apps/` fragments** (from
+palette+overrides), **`apply` deploys them** (symlink + reload). Hand-edits to
+`apps/<app>/…` survive every `apply` and are only regenerated by an explicit
+`render`/`recompile`+`render`.
+
+`--saturation F` overrides `[mood] hue_saturation_floor` for that compile, so one
+image can produce several saved variants (e.g. `new succ-muted img`, `new
+succ-mid img --saturation 0.30`). `new`/`recompile` print a compile-stats block
+(see "Compile stats").
 
 Core = `list / new / apply / current`; `preview` + `recompile` round out v1.
 

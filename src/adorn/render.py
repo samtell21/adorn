@@ -4,13 +4,19 @@ from pathlib import Path
 
 import jinja2
 
+from . import color
+
 
 def make_env(templates_dir) -> jinja2.Environment:
-    return jinja2.Environment(
+    env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(templates_dir)),
         undefined=jinja2.StrictUndefined,
         keep_trailing_newline=True,
     )
+    env.filters["mix"] = color.mix
+    env.filters["lighten"] = color.lighten
+    env.filters["darken"] = color.darken
+    return env
 
 
 def _atomic_write(path: Path, content: str) -> None:

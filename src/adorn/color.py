@@ -45,3 +45,12 @@ def gradient(stops: list[str], n: int) -> list[str]:
     quoted_stops = ' '.join(f'"{s}"' for s in stops)
     out = _run(f"pastel gradient -n {n} {quoted_stops} | pastel format hex")
     return [line.strip().lower() for line in out.splitlines() if line.strip()]
+
+
+def darken(c: str, amount: float) -> str:
+    return _to_hex(f'pastel darken {amount} "{c}"')
+
+
+def mix(c1: str, c2: str, fraction: float = 0.5) -> str:
+    # c1 mixed toward c2 by `fraction` (verified: pastel color C1 | pastel mix --fraction F C2)
+    return _to_hex(f'pastel color "{c1}" | pastel mix --fraction {fraction} "{c2}"')

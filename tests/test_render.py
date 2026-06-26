@@ -56,3 +56,12 @@ def test_materialize_uses_given_templates_dir(tmp_path):
     m = manifest_with(tmp_path, [Target("kitty", template="k.tmpl", fragment="colors.conf")])
     render.materialize(m, {"red": "#ff0000"}, tmp_path / "apps", sdir)
     assert (tmp_path / "apps" / "kitty" / "colors.conf").read_text() == "c1 #ff0000"
+
+
+def test_materialize_color_filters(tmp_path):
+    (tmp_path / "templates").mkdir(exist_ok=True)
+    (tmp_path / "templates" / "f.tmpl").write_text("{{ bg | mix(green, 0.5) }}|{{ fg | darken(0.1) }}")
+    m = manifest_with(tmp_path, [Target("x", template="f.tmpl", fragment="c")])
+    render.materialize(m, {"bg": "#000000", "green": "#00ff00", "fg": "#cccccc"}, tmp_path / "apps", tmp_path / "templates")
+    parts = (tmp_path / "apps" / "x" / "c").read_text().split("|")
+    assert all(p.startswith("#") and len(p) == 7 for p in parts)

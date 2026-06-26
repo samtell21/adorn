@@ -35,3 +35,16 @@ def test_gradient_returns_n_colors():
     g = color.gradient(["#000000", "#ffffff"], 5)
     assert len(g) == 5
     assert all(x.startswith("#") for x in g)
+
+
+def test_mix_blends_toward_second_color():
+    # black mixed halfway to green -> a dark green
+    out = color.mix("#000000", "#00ff00", 0.5)
+    h, s, l = color.hsl(out)
+    assert approx(h, 120, 8)      # green hue
+    assert l < 0.35               # dark (it's a wash)
+
+
+def test_darken_decreases_lightness():
+    base = "#808080"
+    assert color.hsl(color.darken(base, 0.2))[2] < color.hsl(base)[2]

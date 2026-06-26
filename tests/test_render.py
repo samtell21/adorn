@@ -65,3 +65,11 @@ def test_materialize_color_filters(tmp_path):
     render.materialize(m, {"bg": "#000000", "green": "#00ff00", "fg": "#cccccc"}, tmp_path / "apps", tmp_path / "templates")
     parts = (tmp_path / "apps" / "x" / "c").read_text().split("|")
     assert all(p.startswith("#") and len(p) == 7 for p in parts)
+
+
+def test_materialize_rgb_filter(tmp_path):
+    (tmp_path / "templates").mkdir(exist_ok=True)
+    (tmp_path / "templates" / "s.tmpl").write_text('GREEN="{{ green | rgb }}"')
+    m = manifest_with(tmp_path, [Target("x", template="s.tmpl", fragment="c")])
+    render.materialize(m, {"green": "#9fb06a"}, tmp_path / "apps", tmp_path / "templates")
+    assert (tmp_path / "apps" / "x" / "c").read_text() == 'GREEN="159;176;106"'

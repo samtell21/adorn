@@ -51,3 +51,8 @@ def gradient(stops: list[str], n: int) -> list[str]:
     grad = _run(["pastel", "gradient", "-n", str(n), *stops])
     out = _run(["pastel", "format", "hex"], stdin=grad)
     return [ln.strip().lower() for ln in out.splitlines() if ln.strip()]
+
+
+def rgb_triple(c: str) -> str:
+    """Convert #rrggbb to an ANSI 24-bit 'r;g;b' triple (e.g. '#9fb06a' -> '159;176;106')."""
+    return f"{int(c[1:3], 16)};{int(c[3:5], 16)};{int(c[5:7], 16)}"

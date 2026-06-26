@@ -16,6 +16,7 @@ def make_env(templates_dir) -> jinja2.Environment:
     env.filters["mix"] = color.mix
     env.filters["lighten"] = color.lighten
     env.filters["darken"] = color.darken
+    env.filters["rgb"] = color.rgb_triple
     return env
 
 

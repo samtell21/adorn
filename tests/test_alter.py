@@ -86,3 +86,11 @@ def test_cli_rejects_unknown_flag_on_nonalter_subcommand(tmp_path):
 def test_cli_alter_still_passes_through_command(tmp_path):
     setup_theme(tmp_path)
     assert cli.main(["--root", str(tmp_path), "alter", "t", "-c", "red", "saturate", "0.3"]) == 0
+
+
+def test_alter_output_has_swatches(tmp_path, capsys):
+    setup_theme(tmp_path)
+    commands.cmd_alter(tmp_path, "t", ["red"], False, ["saturate", "0.3"])
+    out = capsys.readouterr().out
+    assert out.count("\x1b[48;2;") == 2   # a swatch for before AND after
+    assert "->" in out

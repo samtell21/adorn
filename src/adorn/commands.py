@@ -13,6 +13,15 @@ from . import reload as reload_mod
 from . import render as render_mod
 
 
+def _swatch(hexv: str) -> str:
+    """Render a 4-space ANSI truecolor swatch background."""
+    try:
+        r, g, b = int(hexv[1:3], 16), int(hexv[3:5], 16), int(hexv[5:7], 16)
+    except (ValueError, IndexError):
+        return "    "
+    return f"\x1b[48;2;{r};{g};{b}m    \x1b[0m"
+
+
 def load_manifest(root):
     return manifest_mod.load(Path(root) / "adorn.toml")
 
@@ -185,7 +194,8 @@ def cmd_alter(root, name, colors, write, command) -> None:
         )
 
     for role, newc in zip(selected, results):
-        print(f"{role:<14} {selectable[role]} -> {newc}")
+        before = selectable[role]
+        print(f"{role:<14} {_swatch(before)} {before}  ->  {_swatch(newc)} {newc}")
 
     if write:
         tp = catalog.theme_paths(root, name)
@@ -212,10 +222,8 @@ def cmd_preview(root, name) -> None:
         colors = value if isinstance(value, list) else [value]
         for i, c in enumerate(colors):
             label = f"{key}{i}" if isinstance(value, list) else key
-            try:
-                r, g, b = int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16)
-            except (ValueError, IndexError):
+            swatch = _swatch(c)
+            if swatch == "    ":
                 print(f"{label:<16}{c}")
-                continue
-            swatch = f"\x1b[48;2;{r};{g};{b}m        \x1b[0m"
-            print(f"{label:<16}{swatch} {c}")
+            else:
+                print(f"{label:<16}{swatch} {c}")

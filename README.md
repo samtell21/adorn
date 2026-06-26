@@ -36,7 +36,7 @@ adorn alter oceanic -c accent -w mix +magenta   # nudge a color and save it
     waybar-colors.css.tmpl
   themes/
     oceanic/
-      wallpaper.jpg
+      wallpaper.jpg       # any image type magick reads (jpg/png/webp/…); kept at its given extension
       palette.toml        # derived roles (generated)
       overrides.toml      # your per-role tweaks
       theme.toml          # which scheme this theme uses
@@ -138,7 +138,7 @@ Every template is rendered with these variables:
 | `red` `green` `yellow` `blue` `cyan` `magenta` | the six semantic hues |
 | `urgent` `success` `warning` | aliases of `red` / `green` / `yellow` |
 | `grad` | the default color **array** (a list), e.g. `{{ grad[0] }}` … `{{ grad[6] }}` |
-| `wallpaper` | absolute path to the theme's wallpaper |
+| `wallpaper` | absolute path to the theme's wallpaper (whatever image type you gave `new`) |
 
 …plus **any custom roles you define** in the scheme (see below). Single-color
 roles come from `[hues]` (theme-derived) or `[fixed]` (literal); arrays come from

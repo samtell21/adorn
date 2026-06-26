@@ -48,3 +48,14 @@ def test_mix_blends_toward_second_color():
 def test_darken_decreases_lightness():
     base = "#808080"
     assert color.hsl(color.darken(base, 0.2))[2] < color.hsl(base)[2]
+
+
+def test_no_shell_injection_via_color_value(tmp_path):
+    # a color value containing shell metacharacters must NOT execute — it's just
+    # an (invalid) argument to pastel, which errors; no file is created.
+    import subprocess, pytest
+    sentinel = tmp_path / "PWNED"
+    evil = f'#000000; touch {sentinel}'
+    with pytest.raises(subprocess.CalledProcessError):
+        color.hsl(evil)            # pastel rejects the bogus color, no shell runs
+    assert not sentinel.exists()

@@ -137,6 +137,7 @@ def build_palette(raw: list[str], scheme_config: dict, *, saturation_floor=None)
 def compile_theme(root, name, manifest, *, saturation_floor=None) -> CompileResult:
     tp = catalog.theme_paths(root, name)
     scheme_cfg = load_scheme_config(manifest.schemes_dir / catalog.theme_scheme(tp))
+    scheme_cfg = merge_scheme_config(scheme_cfg, catalog.theme_overrides(tp))
     raw = extract_mod.extract(manifest.extract_command, tp.wallpaper)
     mood = scheme_cfg.get("mood", {})
     strength = mood.get("saturation_strength", 1.0)

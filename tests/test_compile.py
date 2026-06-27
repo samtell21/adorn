@@ -177,3 +177,22 @@ def test_merge_does_not_mutate_base():
     base = {"mood": {"bg_lightness": 0.07}}
     compile_mod.merge_scheme_config(base, {"mood": {"bg_lightness": 0.03}})
     assert base["mood"]["bg_lightness"] == 0.07
+
+
+def test_compile_theme_applies_theme_override(tmp_path):
+    d = catalog.new_theme_dir(tmp_path, "t")
+    img = d / "wallpaper.png"
+    # argv list, no shell — matches the no-shell convention in color.py
+    subprocess.run(["magick", "-size", "16x16", "xc:#9b9e61", str(img)], check=True)
+    (tmp_path / "schemes" / "default").mkdir(parents=True)
+    (tmp_path / "schemes" / "default" / "scheme.toml").write_text(
+        '[mood]\nbg_lightness=0.07\n[list]\nname="grad"\nlength=7\nhues=[300,215,175,120,40]\n',
+        encoding="utf-8",
+    )
+    # theme pins accent on top of the scheme's wallpaper-derived accent
+    (d / "theme.toml").write_text(
+        'scheme = "default"\n[fixed]\naccent = "#abcdef"\n', encoding="utf-8"
+    )
+    m = types.SimpleNamespace(extract_command=DEFAULT_EXTRACT, schemes_dir=tmp_path / "schemes")
+    result = compile_mod.compile_theme(tmp_path, "t", m)
+    assert result.palette["accent"] == "#abcdef"   # theme override reached derivation

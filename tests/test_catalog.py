@@ -76,7 +76,7 @@ def test_theme_paths_wallpaper_edge_cases(tmp_path):
 
 
 def test_theme_overrides_absent_is_empty(tmp_path):
-    d = _mk(tmp_path, "nometa")
+    _mk(tmp_path, "nometa")
     tp = catalog.theme_paths(tmp_path, "nometa")
     assert catalog.theme_overrides(tp) == {}
 

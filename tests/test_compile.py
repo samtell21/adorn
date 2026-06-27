@@ -196,3 +196,13 @@ def test_compile_theme_applies_theme_override(tmp_path):
     m = types.SimpleNamespace(extract_command=DEFAULT_EXTRACT, schemes_dir=tmp_path / "schemes")
     result = compile_mod.compile_theme(tmp_path, "t", m)
     assert result.palette["accent"] == "#abcdef"   # theme override reached derivation
+
+
+def test_merge_does_not_mutate_base_list_items():
+    base = {"list": [{"name": "grad", "length": 7, "hues": [300, 120]}]}
+    merged = compile_mod.merge_scheme_config(
+        base, {"list": [{"name": "warm", "length": 3, "hues": [10]}]}
+    )
+    grad = next(a for a in merged["list"] if a["name"] == "grad")
+    grad["length"] = 99   # mutate the surviving base-derived item in the result
+    assert base["list"][0]["length"] == 7   # base must be untouched

@@ -49,15 +49,15 @@ def load_scheme_config(scheme_dir) -> dict:
     return {}
 
 
-def _merge_lists(base, override):
+def _merge_lists(base, override) -> list[dict]:
     """Merge [[list]] arrays by `name`. Accepts a dict (single) or list of dicts."""
     def as_list(v):
         if v is None:
             return []
         return [v] if isinstance(v, dict) else list(v)
-    by_name = {a["name"]: a for a in as_list(base)}
+    by_name = {a["name"]: dict(a) for a in as_list(base)}
     for a in as_list(override):
-        by_name[a["name"]] = a   # same name replaces (keeps base position), new appends
+        by_name[a["name"]] = dict(a)   # same name replaces (keeps base position), new appends
     return list(by_name.values())
 
 
@@ -130,7 +130,7 @@ def build_palette(raw: list[str], scheme_config: dict, *, saturation_floor=None)
         stops = [color.make_hsl(h, sat, HUE_LIGHTNESS) for h in arr["hues"]]
         pal[arr["name"]] = color.gradient(stops, arr["length"])
 
-    pal.update(fixed)   # scheme's fixed roles win over derivation
+    pal.update(fixed)   # fixed roles (scheme + theme override) win over derivation
     return pal
 
 

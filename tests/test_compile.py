@@ -73,7 +73,7 @@ def test_compile_theme_writes_palette(tmp_path):
     # build a minimal catalog with a real solid wallpaper
     d = catalog.new_theme_dir(tmp_path, "t")
     img = d / "wallpaper.png"
-    subprocess.run(f"magick -size 16x16 xc:#9b9e61 {img}", shell=True, check=True)
+    subprocess.run(["magick", "-size", "16x16", "xc:#9b9e61", str(img)], check=True)
     (tmp_path / "schemes" / "default").mkdir(parents=True)
     (tmp_path / "schemes" / "default" / "scheme.toml").write_text(
         '[mood]\nbg_lightness=0.07\n[list]\nname="grad"\nlength=7\nhues=[300,215,175,120,40]\n',

@@ -49,6 +49,37 @@ def load_scheme_config(scheme_dir) -> dict:
     return {}
 
 
+def _merge_lists(base, override):
+    """Merge [[list]] arrays by `name`. Accepts a dict (single) or list of dicts."""
+    def as_list(v):
+        if v is None:
+            return []
+        return [v] if isinstance(v, dict) else list(v)
+    by_name = {a["name"]: a for a in as_list(base)}
+    for a in as_list(override):
+        by_name[a["name"]] = a   # same name replaces (keeps base position), new appends
+    return list(by_name.values())
+
+
+def merge_scheme_config(base: dict, override: dict) -> dict:
+    """Per-key deep merge of a theme's overrides onto a scheme's base config.
+
+    Tables ([mood]/[hues]/[fixed]) merge key-wise; [[list]] arrays merge by
+    `name`. Sections absent from `override` are taken from `base`. Does not
+    mutate `base`.
+    """
+    merged = {k: (dict(v) if isinstance(v, dict) else v) for k, v in base.items()}
+    for key, oval in override.items():
+        bval = merged.get(key)
+        if key == "list":
+            merged[key] = _merge_lists(bval, oval)
+        elif isinstance(bval, dict) and isinstance(oval, dict):
+            merged[key] = {**bval, **oval}
+        else:
+            merged[key] = oval
+    return merged
+
+
 def build_palette(raw: list[str], scheme_config: dict, *, saturation_floor=None) -> dict:
     if not raw:
         raise ValueError("build_palette requires at least one raw color")

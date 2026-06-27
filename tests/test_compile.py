@@ -124,3 +124,56 @@ def test_load_scheme_config(tmp_path):
 
 def test_load_scheme_config_missing_is_empty(tmp_path):
     assert compile_mod.load_scheme_config(tmp_path / "nope") == {}
+
+
+def test_merge_empty_override_returns_base():
+    base = {"mood": {"bg_lightness": 0.07, "saturation_strength": 1.0}, "hues": {"red": 0}}
+    assert compile_mod.merge_scheme_config(base, {}) == base
+
+
+def test_merge_mood_is_per_key():
+    base = {"mood": {"bg_lightness": 0.07, "saturation_strength": 1.0}}
+    merged = compile_mod.merge_scheme_config(base, {"mood": {"bg_lightness": 0.03}})
+    assert merged["mood"] == {"bg_lightness": 0.03, "saturation_strength": 1.0}
+
+
+def test_merge_hues_is_per_key():
+    base = {"hues": {"red": 0, "blue": 215}}
+    merged = compile_mod.merge_scheme_config(base, {"hues": {"red": 10}})
+    assert merged["hues"] == {"red": 10, "blue": 215}
+
+
+def test_merge_fixed_is_per_key():
+    base = {"fixed": {"bg": "#000000", "accent": "#111111"}}
+    merged = compile_mod.merge_scheme_config(base, {"fixed": {"accent": "#abcdef"}})
+    assert merged["fixed"] == {"bg": "#000000", "accent": "#abcdef"}
+
+
+def test_merge_lists_by_name_replace_and_append():
+    base = {"list": [
+        {"name": "grad", "length": 7, "hues": [300, 120]},
+        {"name": "warm", "length": 3, "hues": [10, 40]},
+    ]}
+    override = {"list": [
+        {"name": "grad", "length": 5, "hues": [200]},   # replaces same-name
+        {"name": "cool", "length": 2, "hues": [200, 240]},  # appends
+    ]}
+    merged = compile_mod.merge_scheme_config(base, override)
+    by_name = {a["name"]: a for a in merged["list"]}
+    assert by_name["grad"]["length"] == 5
+    assert by_name["warm"]["length"] == 3
+    assert by_name["cool"]["length"] == 2
+
+
+def test_merge_single_list_dict_normalizes():
+    base = {"list": {"name": "grad", "length": 7, "hues": [300, 120]}}
+    override = {"list": {"name": "grad", "length": 4, "hues": [200]}}
+    merged = compile_mod.merge_scheme_config(base, override)
+    by_name = {a["name"]: a for a in merged["list"]}
+    assert by_name["grad"]["length"] == 4
+
+
+def test_merge_does_not_mutate_base():
+    base = {"mood": {"bg_lightness": 0.07}}
+    compile_mod.merge_scheme_config(base, {"mood": {"bg_lightness": 0.03}})
+    assert base["mood"]["bg_lightness"] == 0.07

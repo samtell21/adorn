@@ -60,3 +60,13 @@ def theme_scheme(theme_paths) -> str:
     if meta.exists():
         return tomllib.loads(meta.read_text(encoding="utf-8")).get("scheme", "default")
     return "default"
+
+
+def theme_overrides(theme_paths) -> dict:
+    """The theme's derivation overrides: theme.toml minus the `scheme` key."""
+    meta = theme_paths.meta
+    if not meta.exists():
+        return {}
+    data = tomllib.loads(meta.read_text(encoding="utf-8"))
+    data.pop("scheme", None)
+    return data

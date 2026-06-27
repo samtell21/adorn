@@ -73,3 +73,28 @@ def test_theme_paths_wallpaper_edge_cases(tmp_path):
     (d2 / "wallpaper.png").write_bytes(b"")
     tp2 = catalog.theme_paths(tmp_path, "multi")
     assert tp2.wallpaper == d2 / "wallpaper.jpg"  # lexicographically first
+
+
+def test_theme_overrides_absent_is_empty(tmp_path):
+    d = _mk(tmp_path, "nometa")
+    tp = catalog.theme_paths(tmp_path, "nometa")
+    assert catalog.theme_overrides(tp) == {}
+
+
+def test_theme_overrides_only_scheme_is_empty(tmp_path):
+    d = _mk(tmp_path, "bare")
+    (d / "theme.toml").write_text('scheme = "default"\n', encoding="utf-8")
+    tp = catalog.theme_paths(tmp_path, "bare")
+    assert catalog.theme_overrides(tp) == {}
+
+
+def test_theme_overrides_returns_sections_without_scheme(tmp_path):
+    d = _mk(tmp_path, "over")
+    (d / "theme.toml").write_text(
+        'scheme = "default"\n[mood]\nbg_lightness = 0.03\n[fixed]\naccent = "#abcdef"\n',
+        encoding="utf-8",
+    )
+    tp = catalog.theme_paths(tmp_path, "over")
+    ov = catalog.theme_overrides(tp)
+    assert "scheme" not in ov
+    assert ov == {"mood": {"bg_lightness": 0.03}, "fixed": {"accent": "#abcdef"}}
